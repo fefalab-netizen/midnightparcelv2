@@ -1,0 +1,172 @@
+# Midnight Parcel Service — WebXR
+
+A playable, stationary supernatural parcel-inspection game based on the project's Midnight Parcel Service bible. Inspect suspicious packages in a moonlit shop, identify their contents, complete treatments, and help your Mawhound companion grow in a pocket sanctuary.
+
+Handwritten HTML, CSS, and JavaScript, with **Three.js 0.180.0 bundled locally**. No build step, package installation, backend, account, CDN, or Unity runtime required. The illustrated field guide is bundled in `assets/`. All paths are relative, including under a GitHub repository URL.
+
+## Cardboard Imp and parcel art — v0.10
+
+Cardboard Imp is the first/default companion. Its supplied textures, rig, and five animations (agree gesture, boxing practice, play dead, running, walking) are combined into one approximately 10 MB GLB. It wanders, pauses, gestures, and reacts to care. The five-piece sigil uses the same design in light brown; the first completion awakens the imp, and later completions increase its level.
+
+Mawhound remains available through **Visit Mawhound** in the sanctuary. Each companion has its own fragments, level, and care needs. Choose a companion before the next shift to direct rescued fragments to its sigil. Older saves retain their Mawhound progress and receive a new imp sigil; a backup of the older save is kept in browser storage.
+
+All four translucent paper overlays and the 25-sticker atlas load in the browser. Overlays have slightly stronger lines for readability, and parcels picked up during texture loading receive their decoration when released. A focused asset preview is available at tools/asset-preview.html without changing saved progress. The combined textured model and package art were checked there; no full test suite or headset pass was run for this update.
+
+The ZIP is a complete game bundle, including both pets, all artwork, both new environments, local Three.js dependencies, and source. Extract it and upload the contents of WebXR to your repository root. Do not upload only the ZIP itself.
+
+## Back room and outdoor sanctuary — v0.9
+
+Closing a shift now takes you to a dark stone back room inspired by the supplied reference, with storage cages, shelves, candlelight, a bed, and a glowing purple portal bottle.
+
+- Touch the bottle to enter a spacious outdoor sanctuary with distant hills, trees, flowers, a cottage, a pond, and an animated purple portal.
+- Touch the return portal to go back to your room. Touch the bed to call it a night and start the next shift.
+- Desktop: click the bottle, bed, or portal, or use the matching action buttons. VR: point and trigger, or touch with a tracked controller.
+- Mawhound lives in the outdoor clearing and roams within its safe bounds. The existing five-fragment awakening and repeated sigil level-ups are preserved. No additional pets were introduced.
+- The new environments are procedural cel-shaded interpretations of the references. This remains a stationary game; the distant landscape is scenery.
+- This release also includes four translucent paper overlays and a 25-sticker atlas applied randomly to packages.
+
+All runtime assets are included for static GitHub Pages hosting. Upload the extracted **contents of WebXR**, including **assets**, **vendor**, and **.nojekyll**, with index.html at the repository root. No build command is required.
+
+Tests and browser/headset play-testing were not run for this update, as requested. Earlier validation notes below describe previous releases only.
+
+## Updated shop — v0.2
+
+- Seven parcel silhouettes: carton, flat box, tall box, guitar case, L-shaped parcel, mailing tube, and triangular parcel.
+- Tiny 3.8 cm clue decals, roughly one quarter of the original width. Marks sit on actual silhouette faces and edges, including the guitar neck and the L's inner edge. Desktop mouse-wheel zoom helps close inspection; in VR bring the parcel toward your eyes.
+- Paw-marked parcels now use a **2 / 2 / 1 opportunity rhythm** across full shifts. The first four introductory parcels still cover safe, curse, monster, and demon.
+- A hinged front door replaces the central wall display. An animated customer opens it, walks up with **1–3 parcels**, delivers them, then leaves. Remaining parcels sit in a counter tray. Finish that batch before the next customer arrives. Pause freezes the visitor too.
+- A large angled desk tablet replaces the floating action board and sanctuary miniature. Status and decisions are on the tablet; sanctuary remains accessible after closing.
+- The illustrated gothic reference poster is attached to the **lower-right pane of the shop window left of the door**, in both desktop and VR. There is no screen-corner overlay. Click the physical poster on desktop to enlarge it, or use the Field guide button.
+- Darker shop lighting with a warm task light over the inspection mat. The sanctuary keeps its brighter lighting. A framed illuminated shop sign hangs over the new door.
+
+### Customer update — v0.3
+
+The delivery customer is now an original grey/violet faceted human inspired by the supplied portrait: long angular face, defined nose and cheek planes, deep-set eyes, swept hair, charcoal-purple jacket, lapels, grey shirt, and violet tie. Hip, knee, shoulder, elbow, neck and head groups animate walking, carrying and handing over parcels. The mesh uses approximately 7,000 triangles and is generated locally, with no downloaded human model required.
+
+The requested [hmthanh/3d-human-model repository](https://github.com/hmthanh/3d-human-model) was researched. Its [viewer source](https://github.com/hmthanh/3d-human-model/blob/main/src/viewer.js) loads GLB assets using `GLTFLoader` and handles clips with `AnimationMixer`; its README lists the human bone hierarchy. Those concepts informed the joint structure here. This game's new mesh and procedural joint animation were authored independently; the repository's GLB assets and source code are not included.
+
+For a close inspection, open `tests/customer-preview.html` through the local server. It provides portrait, full-figure, walking and carrying views. Headset frame rate and appearance still need a Quest 2 check.
+
+## Play on your computer
+
+### Comic surface pass — v0.4
+
+Surfaces now use a shared three-band lighting ramp, thick geometric ink edges and procedural pen-drawn grain. The counter, shelving, door, window trim, floors, and sanctuary furniture have inked wood surfaces inspired by the supplied table reference. Walls use subdued dry-brush texture; plants have dark silhouette shells. The customer uses the same cel-lighting ramp. Parcel faces stay clear of decorative scratch patterns so inspection clues remain distinguishable. Text, the poster, and tablet controls retain their legibility.
+
+Textures are drawn in code and shared; no new network assets or postprocessing dependency is needed. Visual rendering and browser console were checked locally. The additional outline geometry has not yet been profiled on Quest 2.
+
+With Node.js installed, open a terminal in this folder:
+
+```sh
+node server.mjs
+```
+
+Open **http://localhost:8080**. Keep the terminal running while playing. Opening the HTML directly as a `file://` URL will not load JavaScript modules correctly.
+
+## Upload to GitHub and play on Quest
+
+1. Create a GitHub repository for this game.
+2. Upload **the contents of this folder** into that repository, preserving `vendor/` and `tests/`. `index.html` must be at the repository root. Extract the ZIP first; uploading just a ZIP will not publish a playable page.
+3. Open the repository's **Settings → Pages**.
+4. Select **Deploy from a branch**, choose **main**, select **/(root)**, and save.
+5. Wait for GitHub to show the published Pages URL, typically `https://YOUR-NAME.github.io/YOUR-REPOSITORY/`.
+6. Open that **HTTPS URL in the browser on your Quest**, then select **Enter VR**. Approve the browser's immersive-session prompt if shown.
+
+The server supplied here listens on your computer's localhost for desktop development. `localhost` on the Quest is the Quest itself, so use the published HTTPS page for headset testing.
+
+If you keep this folder inside a larger repository, publish that repository's root and open its `/WebXR/` path instead. Do not upload the parent Unity project just to publish this game.
+
+[Official GitHub Pages publishing instructions](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site)
+
+## Controls
+
+| Action | Desktop / touch | Quest Touch controllers |
+| --- | --- | --- |
+| Inspect all six faces | Drag the scene; arrow keys rotate | Point at parcel, hold either grip, turn your wrist |
+| Select a tool or action | Click/tap its button | Point the ray and press trigger |
+| Return parcel to counter | Reset parcel / R | Release grip |
+| Pause | Pause button / Space when scene has focus | Pause shift on the floating board |
+| Finish a shift early | Close early | Close early on the floating board |
+| Adjust seated/standing position | Fixed desktop viewpoint | Recenter desk, while looking forward |
+
+All essential controls and instructions have in-world counterparts. No artificial walking or smooth turning is required. Losing controller connection returns a held parcel; leaving immersive mode, hiding the page, or losing session visibility pauses the shift. Release always returns a parcel to a reachable position instead of dropping it on the floor.
+
+## The playable loop
+
+- **Five-minute shifts:** receive a customer batch, inspect, test, resolve, earn coins, close, visit sanctuary, and begin another shift. Close early at any time. The first four parcels introduce the non-chibi categories; subsequent parcels are randomized using a repeatable shift seed.
+- **Safe:** no supernatural mark on any face. Approve and ship.
+- **Curse:** spiral seal. Apply powder, then touch I → II → III.
+- **Wild monster:** claw scratches. Offer bait, then close three latches while the moving needle is inside the center zone.
+- **Demon:** triangular eye. Apply the ward, then touch III → II → I.
+- **Chibi:** paw print. Ring the bell, hum, offer food, and open gently. Each successful rescue restores one sigil fragment, saved at shift end. Five awaken Mawhound at level 1; every five additional fragments grant another level.
+- **Economy:** correct resolutions earn 10; shipping an afflicted parcel loses 15. Basic tests cost 6 seconds and no coins. Failed treatment steps cost 4 seconds. Coins settle at the end of the shift and never fall below zero.
+- **Sanctuary:** feed, brush, tuck in, play, and pet. Care is free and untimed; needs never cause permanent harm. The five-piece sigil appears before Mawhound. Upon awakening, he appears with his smaller sigil beside him. The sigil resets and stays visible for each new level. Old earned paw progress becomes fragments; the original browser save is backed up.
+- **Upgrades:** spend 40 coins on a test kit that reduces the test cost to 3 seconds, or 60 on a decorative moon garden.
+- **Saves:** local browser storage saves completed shifts, coins, upgrades, roster, and care. A live shift does not alter its saved checkpoint. Reloading an unfinished shift restarts it from the beginning. Saves are specific to the browser and origin, so desktop and headset progress are separate. Blocked browser storage produces a visible warning.
+
+## Scope and verification
+
+This is a **first playable**, not the completed premium game described by the bible. It has seven parcel shapes, animated customer batches, four treatment activities, procedural geometry, a shop and sanctuary, and repeatable randomized shifts. The full 24-shape catalog, eight minigames, truck batches, customer dialogue, authored 36-shift campaign, event nights, sophisticated physical interactions, final art/audio, cloud saves, and store integration are not implemented.
+
+The visible clue textures are attached to randomized parcel surfaces. Their much smaller fixed size follows the latest requested difficulty change rather than the original bible's 2–4% surface coverage. Current shaders use basic toon materials, geometric ink edges, inexpensive lights, and no real-time shadows.
+
+**Verified:** JavaScript syntax; 32 automated checks covering customer arrivals, queue depletion, pause, timer expiry, diagnosis, treatments, settlement, rescue, care, purchases, save validation, shape generation, surface normals, sigil collection and leveling, three-shift pacing, and save migration. Browser rendering and delivery of one- and three-parcel batches were observed without console errors.
+
+**Not verified:** physical Quest 2 tracking, both-hand interaction, recentering, comfort, and device frame rate. WebXR controller code is implemented; this environment cannot substitute for an actual headset session. Check these on Quest before presenting the build as headset-tested or store-ready.
+
+Run the core checks:
+
+```sh
+node --test tests/*.test.mjs
+```
+
+## Files
+
+- `index.html`, `style.css`: responsive desktop interface and field guide.
+- `game.js`: 3D environments, parcel marks, UI, synthesized sound, desktop and WebXR input.
+- `core.js`: rendering-independent game rules and save validation.
+- `shapes.js`: parcel silhouettes and surface-safe clue placement.
+- `customer.js`: original faceted human model and humanoid joint animation.
+- `cel.js`: shared toon lighting ramp, ink geometry and procedural surface textures.
+- `assets/night-desk-guide.png`: illustrated reference card. Its generation prompt and method are recorded in `assets/ART-NOTES.md`.
+- `vendor/`: pinned renderer and its MIT license; keep the license with redistributed copies.
+- `server.mjs`: dependency-free local development server.
+- `tests/`: game-rule checks using Node's built-in test runner.
+
+Original geometry, clue textures, interface, and synthesized tones are generated by this project's code. The reference-card illustration was created with the built-in image-generation tool. Mawhound is the user-supplied model; the original source is preserved alongside a derived textured and rigged GLB. No broad open-source license is assigned to your original game code here; choose one before inviting reuse. Three.js remains under its included MIT license.
+
+WebXR implementation reference: [Three.js WebXRManager documentation](https://threejs.org/docs/pages/WebXRManager.html).
+
+## Mawhound companion — v0.7
+
+`assets/models/Mawhound-game.glb` is the portable, self-contained model used by the game. It contains calculated normals, UVs, a procedural fur texture, grey-violet vertex colours, and a **17-joint quadruped skeleton**. Each of the four legs has upper-leg, lower-leg and paw joints; body, chest, head and tail have separate controls. Smooth skin weights blend across the original joined mesh.
+
+Eight animations are embedded:
+
+- **Idle breathing:** chest breathing, head motion and tail sway.
+- **Walking:** a looping four-beat walk in place. The game moves him between safe waypoints while this clip plays. The standalone clip has no horizontal root motion.
+- **Rear-leg stand:** rises onto the rear legs, holds the pose, then returns to all fours. The rear paw joints remain planted. The asset head angle faces forward, and the game aims his head toward the desktop camera or VR headset.
+- **Play bow:** bends the forelegs and lowers the front of the body.
+- **Curious head tilt:** looks inquisitively to either side.
+- **Happy greeting:** head nods and tail wagging.
+- **Sniff around:** lowers his head to investigate.
+- **Shake off:** shakes his head, chest and tail.
+
+Mawhound explores automatically in the sanctuary, alternating safe table walks with sniffing, shaking, playful gestures and short rests. Local weighted behavior responds to care needs and avoids immediately repeating an action; no remote AI service or API key is required. Care and manual tricks interrupt his current activity, after which autonomous behavior resumes. Feeding triggers sniffing, brushing triggers shaking, tucking in triggers rest, playing triggers a bow, and petting triggers his rear-leg stand. Choose **Animations & tricks** to request any of the eight clips. `tests/mawhound-preview.html` includes front/side/back views, an animation selector, replay/pause, a timeline scrubber, and an autonomous-behavior toggle.
+
+The editable rig is in `mawhound-rig.js`; reproduce the assets with `node tools/make-fur.mjs` followed by `node tools/bake-mawhound.mjs`. The original `assets/models/Mawhound.glb` is untouched. Tests check skin weights, mesh deformation, walk-loop continuity, movement of all four paws, rear-paw placement during standing, the exported GLB joints and clips, bounded roaming, varied behavior, care interruptions, and camera tracking.
+
+The rig is a procedural first pass over the supplied sculpt; it has no jaw or individual toe articulation. Small vertical contact corrections are baked into the clips to keep paws above the floor. The source mesh remains approximately 237,000 triangles; Quest performance has not been profiled. The GLB is about 11 MB and loads only when visiting the sanctuary. Toon shading is supplied by the game; other GLB viewers show its standard rough material and embedded colours/texture.
+
+Behavior lives in `mawhound-behavior.js`; camera aiming lives in `mawhound-look.js`. Roaming is limited to the sanctuary tabletop with clearance for its edges and the tablet. It pauses outside the sanctuary. Autonomous decisions and navigation are game code, not embedded in the exported GLB.
+
+
+## Five-piece sigil progression — v0.8
+
+Fresh saves begin with a broken sigil and no visible companion. Successfully treating a paw-marked parcel earns one fragment. Five saved fragments trigger a four-second awakening when the sanctuary is visited; the sigil remains beside Mawhound afterwards. Each subsequent set of five raises his level and resets the visible pieces. Excess fragments carry into the next level. No additional mascots are implemented yet.
+
+Paw opportunities are inserted into the next newly created parcel after 45 and 155 seconds of shift-clock elapsed time on two shifts, and after 100 seconds on the third. This repeats. Introductory parcels retain their original order. A player must keep processing deliveries, correctly rescue the paw parcels, and settle the shift to collect those fragments. Missed rescues and early closes can delay progression; there is no automatic fragment award. The target is five opportunities per three full shifts (1.67 per shift).
+
+Save version 3 preserves coins, shift and upgrades. Legacy version 2 Mawhound levels convert to earned fragments (old level minus the original starting level); version 1 rosters convert by rescued count. A browser backup is kept under the existing save key plus `-backup-v1` or `-backup-v2`. Interrupted shifts discard unsaved fragments. Awakening is marked seen only after its reveal completes, so reloading during the reveal can safely replay it.
+
+Use `node tools/analyze-pacing.mjs` for simulated shift throughput. Open `tests/sigil-preview.html` to simulate successive successful shifts and view both awakening and repeat leveling without touching the game save. The exact initial-three-shift 2/2/1 cadence is tested at 8, 12 and 18 seconds of inspection, with and without the quick-test upgrade.
