@@ -1,14 +1,14 @@
 import * as THREE from './vendor/three.module.js';
-import {celMaterial} from './cel.js';
+import {celMaterial,boxSurfaceUV,inkEdges,inkSilhouette} from './cel.js';
 export function createBackRoom({onPortal,onSleep}){
  const root=new THREE.Group();root.visible=false;
- function block(x,y,z,w,h,d,color,wood=false){const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),celMaterial(color,wood?'wood':'plain'));mesh.position.set(x,y,z);root.add(mesh);return mesh;}
- function orb(x,y,z,r,color,sx=1,sy=1,sz=1){const mesh=new THREE.Mesh(new THREE.SphereGeometry(r,12,8),celMaterial(color));mesh.position.set(x,y,z);mesh.scale.set(sx,sy,sz);root.add(mesh);return mesh;}
+ function block(x,y,z,w,h,d,color,wood=false){const geometry=new THREE.BoxGeometry(w,h,d);boxSurfaceUV(geometry,w,h,d);const mesh=new THREE.Mesh(geometry,celMaterial(color,wood?'wood':'plaster'));mesh.position.set(x,y,z);root.add(mesh);inkEdges(mesh,Math.min(.008,Math.max(.0015,Math.min(w,h,d)*.085)));return mesh;}
+ function orb(x,y,z,r,color,sx=1,sy=1,sz=1){const mesh=new THREE.Mesh(new THREE.SphereGeometry(r,12,8),celMaterial(color));mesh.position.set(x,y,z);mesh.scale.set(sx,sy,sz);root.add(mesh);if(r>=.07)inkSilhouette(mesh,.025);return mesh;}
  block(0,-.1,-1.6,6,.2,8,'#242925');block(0,1.8,-3.9,6,3.8,.2,'#161d1d');
  for(let row=0;row<9;row++)for(let col=0;col<10;col++){const x=-2.8+col*.61+(row%2)*.25,y=.19+row*.4;if(Math.abs(x)<.93&&y<2.35)continue;block(x,y,-3.74,.57,.36,.19,['#343b35','#3b4138','#2c3532'][(row+col)%3]);}
  for(const side of [-1,1])for(let row=0;row<9;row++)for(let col=0;col<8;col++)block(side*3,.19+row*.4,-3.5+col*.7,.16,.36,.66,['#303731','#3a4037'][(row+col)%2]);
  block(0,1.1,-3.66,1.62,2.3,.03,'#070b10');for(const x of [-.94,.94])for(let y=.18;y<1.8;y+=.36)block(x,y,-3.51,.32,.32,.4,'#535347');
- const arch=new THREE.Mesh(new THREE.TorusGeometry(.94,.16,6,18,Math.PI),celMaterial('#535347'));arch.position.set(0,1.75,-3.5);root.add(arch);
+ const arch=new THREE.Mesh(new THREE.TorusGeometry(.94,.16,6,18,Math.PI),celMaterial('#535347','plaster'));inkEdges(arch,.005,35);arch.position.set(0,1.75,-3.5);root.add(arch);
  for(let row=0;row<9;row++)for(let col=0;col<7;col++)block(-2.7+col*.8+(row%2)*.15,.008,-3.5+row*.7,.74,.025,.64,(row+col)%3?'#383e35':'#47493b');
  // Empty storage cages and shelving, matching the back-room reference's arrangement.
  for(const [x,z,w,h] of [[-1.9,-1.4,1.15,1.35],[-1.4,-2.65,.85,1.65]]){
@@ -24,7 +24,7 @@ export function createBackRoom({onPortal,onSleep}){
  for(const x of [.43,1.73])for(const z of [-.78,1.13])block(x,.42,z,.1,.8,.1,'#5c4632',true);
  const bed=block(1.08,.49,.18,1.14,.20,1.8,'#9c8556');block(1.08,.62,-.43,.91,.16,.39,'#b1a27b');block(1.08,.61,.39,1.12,.045,1.05,'#3c3f3e');bed.userData.run=onSleep;
  block(.27,.44,-.57,.62,.88,.56,'#54412f',true);
- const bottle=orb(.27,1.10,-.57,.19,'#724bb3',.85,1.05,.85);bottle.material=new THREE.MeshStandardMaterial({color:'#66329b',emissive:'#8c37dd',emissiveIntensity:1.1,roughness:.18,transparent:true,opacity:.85});bottle.userData.run=onPortal;
+ const bottle=orb(.27,1.10,-.57,.19,'#724bb3',.85,1.05,.85);bottle.material=celMaterial('#724bb3').clone();bottle.material.emissive.set('#8c37dd');bottle.material.emissiveIntensity=.45;bottle.userData.run=onPortal;
  block(.27,1.33,-.57,.12,.15,.12,'#665442');
  const rings=[];for(let i=0;i<3;i++){const ring=new THREE.Mesh(new THREE.TorusGeometry(.11+i*.015,.007,5,32),new THREE.MeshBasicMaterial({color:'#e8b0ff'}));ring.position.copy(bottle.position);ring.rotation.set(i*.6,i*.8,0);root.add(ring);rings.push(ring);}
  const glow=new THREE.PointLight('#b57dff',2,2.2);glow.position.copy(bottle.position);root.add(glow);
