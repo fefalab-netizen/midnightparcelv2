@@ -1,0 +1,20 @@
+<!doctype html><meta charset="utf-8"><title>Companion and parcel art preview</title>
+<style>body{margin:0;background:#263c3d;color:#fff;font:16px system-ui}header{padding:12px}button{margin:4px;padding:8px}canvas{display:block}#status{padding:8px}</style>
+<header>Asset preview · does not change saved progress <span id="status">Loading…</span><div id="clips"></div></header>
+<script type="module">
+import * as THREE from '../vendor/three.module.js';
+import {loadCardboardImp} from '../cardboard-imp.js';
+import {SHAPES} from '../shapes.js';
+import {dressParcel,parcelArtReady} from '../parcel-art.js';
+const scene=new THREE.Scene();scene.background=new THREE.Color('#263c3d');scene.add(new THREE.HemisphereLight('#e3efff','#647c49',2.4));const sun=new THREE.DirectionalLight('#c8d7ed',2);sun.position.set(-3,4,4);scene.add(sun);
+const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setSize(innerWidth,innerHeight-120);document.body.append(renderer.domElement);const camera=new THREE.PerspectiveCamera(40,innerWidth/(innerHeight-120),.05,30);camera.position.set(0,2.3,5.5);camera.lookAt(0,.6,0);
+try{
+await parcelArtReady;
+const variants=new Set();for(let i=0;i<100&&variants.size<4;i++){
+ const parcel={id:'preview-'+i,tint:.4,type:'safe',shape:0};const group=new THREE.Group(),g=new THREE.ExtrudeGeometry(new THREE.Shape(SHAPES[0].points.map(([x,y])=>new THREE.Vector2(x,y))),{depth:SHAPES[0].depth,bevelEnabled:false});g.translate(0,0,-SHAPES[0].depth/2);group.add(new THREE.Mesh(g,new THREE.MeshToonMaterial({color:'#b99063'})));dressParcel(group,g,parcel);const overlay=group.children[1],id=overlay.material.map.uuid;if(variants.has(id))continue;group.position.set(-1.8+variants.size*1.2,.38,-1.1);group.rotation.set(.15,.3,0);scene.add(group);variants.add(id);
+}
+const imp=await loadCardboardImp();scene.add(imp.root);imp.root.position.set(0,0,.8);imp.setAutonomous(false);
+for(const clip of imp.clips){const b=document.createElement('button');b.textContent=clip.name;b.onclick=()=>imp.play(clip.name);document.querySelector('#clips').append(b);}
+document.querySelector('#status').textContent=variants.size+' paper variants + sticker atlas loaded · textured imp + '+imp.clips.length+' animations';let previous=0;renderer.setAnimationLoop(t=>{imp.update(previous?Math.min((t-previous)/1000,.05):0);previous=t;renderer.render(scene,camera);});
+}catch(error){document.querySelector('#status').textContent=error.message;console.error(error);}
+</script>
