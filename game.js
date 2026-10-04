@@ -5,9 +5,10 @@ import {dressParcel,parcelArtReady} from './parcel-art.js';
 import { createCustomer } from './customer.js';
 import { celMaterial, boxSurfaceUV, inkEdges, inkSilhouette } from './cel.js';
 import {loadCardboardImp} from './cardboard-imp.js';
+import {createPetHandling} from './pet-handling.js';
 import {loadOtty} from './otty.js';
 import {createMimicGame} from './mimic-game.js';
-import {loadMawhound} from './mawhound.js';
+import {loadMawhound} from './mawhound.js?v=0.14.1';
 import {createMawhoundSigil,renderSigilAwakening} from './sigil.js?v=0.14.0';
 
 import {createWardGame} from './ward-game.js';
@@ -161,7 +162,13 @@ function rebuildPets(){
  const entry=companions.get(game.pet.id);mawhoundStatus=entry?.status||'idle';mawhoundController=entry?.controller||null;mawhoundRoot=mawhoundController?.root||null;
  garden.visible=game.save.garden;updatePetBadge();sigil.setPieces(game.sigilPieces);sigil.setAwakened(game.petAwakened&&game.pet.awakeningSeen);if(game.petAwakened&&mawhoundStatus==='idle')ensureMawhound();
 }
-function selectCompanion(id){if(!game.selectPet(id))return;revealTime=-1;mawhoundTricks=false;rebuildPets();save();}
+function selectCompanion(id){petHandling.cancel();if(!game.selectPet(id))return;revealTime=-1;mawhoundTricks=false;rebuildPets();save();}
+const petHandling=createPetHandling({parent:petsGroup,getPet:()=>mawhoundController,canGrab:()=>game.phase==='sanctuary'&&game.petAwakened&&game.pet.awakeningSeen});
+let resetUntil=0;
+const resetButton=canvasPlane(scene,.65,.22,-3.15,1.18,.15,()=>{},512);
+function paintReset(){const c=resetButton.userData.canvas,ctx=c.getContext('2d');ctx.fillStyle='#301c24';ctx.fillRect(0,0,c.width,c.height);ctx.strokeStyle='#bb8a79';ctx.lineWidth=8;ctx.strokeRect(4,4,c.width-8,c.height-8);ctx.fillStyle='#f4dcc3';ctx.textAlign='center';ctx.textBaseline='middle';ctx.font='bold 36px Georgia';ctx.fillText(resetUntil?'CONFIRM RESET':'RESET PROGRESS',c.width/2,c.height/2,c.width*.94);resetButton.material.map.needsUpdate=true;$('reset-progress').textContent=resetUntil?'Confirm reset — all progress':'Reset progress';}
+function resetProgress(){if(performance.now()>resetUntil){resetUntil=performance.now()+6000;paintReset();return;}petHandling.cancel();powderGame.cancel();wardGame.cancel();toolsOnCounter.cancel();resetParcel();Object.assign(game,new Game(freshSave()));stored=null;revealTime=-1;mawhoundTricks=false;for(const entry of companions.values())if(entry.controller){entry.controller.setAutonomous(false);entry.controller.root.position.set(0,0,0);entry.controller.setRoamBounds({minX:-.8,maxX:.7,minZ:-1.5,maxZ:.2});}resetUntil=0;paintReset();rebuildPets();save();sync(true);}
+resetButton.userData.run=resetProgress;$('reset-progress').onclick=resetProgress;paintReset();
 // Parcel meshes and decals are rebuilt only when a parcel changes.
 const parcel = new THREE.Group();scene.add(parcel);
 const powderGame=createPowderGame({parcel,onPour:index=>invoke(()=>tone(game.pourPowder(index)))});scene.add(powderGame.root);
@@ -231,7 +238,7 @@ for(const x of [-2.142,-1.54])box(room,x,2.213,-3.578,.075,.055,.003,'#ac9d74');
 windowPoster.userData.run=()=>{if(renderer.xr.isPresenting)game.message='Window guide: no mark—ship; spiral—powder; claws—bait; eye—ward; paw—bell. Turn every parcel.';else showGuide();};
 const buttonsGroup=new THREE.Group();actionBoard.add(buttonsGroup);let worldTargets=[], options=[];
 function buildButtons() {
-  disposeGroup(buttonsGroup);worldTargets=[];shopControls.visible=false;
+  disposeGroup(buttonsGroup);worldTargets=[resetButton];shopControls.visible=false;
   if(['summary','backroom'].includes(game.phase)){worldTargets.push(...backRoom.targets);return;}
   const sanctuary=game.phase==='sanctuary';
   if(!sanctuary)worldTargets.push(...toolsOnCounter.targets);
@@ -269,7 +276,7 @@ function closeShift(){if(!toolsOnCounter.busy)invoke(()=>game.close());}
 function togglePause(){if(game.phase==='shift'&&!toolsOnCounter.busy){game.paused=!game.paused;resetParcel();sync(true);}}
 function test(type){const ok=game.test(type);if(ok&&['curse','demon','monster'].includes(type)){resetParcel();drag=null;}tone(ok);}
 function act(i){if(toolsOnCounter.busy||(game.puzzle?.type==='monster'&&!mimicGame.ready))return;const value=timing();tone(game.act(i,value>=.35&&value<=.65));}
-function goBackRoom(){game.backRoom();mawhoundTricks=false;tone();}
+function goBackRoom(){petHandling.cancel();game.backRoom();mawhoundTricks=false;tone();}
 function sleepAndStart(){if(!['backroom','summary'].includes(game.phase))return;save();start();}
 function enterSanctuary(){game.sanctuary();rebuildPets();tone();}
 function care(n){game.care(0,n);mawhoundController?.react(n);save();tone();}
@@ -302,6 +309,7 @@ function sync(force=false) {
   const isSanctuary=game.phase==='sanctuary';
   const isBackRoom=['summary','backroom'].includes(game.phase),mode=isSanctuary?'sanctuary':isBackRoom?'backroom':'shop';
   if(sceneMode!==mode){
+    petHandling.cancel();
     toolsOnCounter.cancel();mouseTool=null;sceneMode=mode;sanctuaryMode=isSanctuary;room.visible=mode==='shop';petRoom.visible=isSanctuary;backRoom.root.visible=isBackRoom;vrUI.visible=!isBackRoom;
     scene.background.set(isSanctuary?'#80afd3':isBackRoom?'#0b1013':'#0d1a27');scene.fog.color.copy(scene.background);scene.fog.near=isSanctuary?25:7;scene.fog.far=isSanctuary?85:20;
     hemi.color.set(isSanctuary?'#e3efff':'#7189a6');hemi.groundColor.set(isSanctuary?'#647c49':'#0a101b');hemi.intensity=isSanctuary?2.4:isBackRoom ? .55 : .65;
@@ -312,7 +320,7 @@ function sync(force=false) {
   $('shift').textContent=String(game.save.shift-(game.phase==='summary'?1:0)).padStart(2,'0');$('timer').textContent=game.phase==='shift'?formatTime(game.time):'—';$('money').textContent=game.save.money;
   $('message').textContent=game.paused?'The clock is stopped. Take your time.':game.message;
   $('title').textContent=game.phase==='lobby'?'Welcome, custodian.':isBackRoom?'The night is yours.':isSanctuary?(game.petAwakened&&game.pet.awakeningSeen?`${game.pet.name} · Level ${game.petLevel}`:`${game.pet.name} sigil · ${game.sigilPieces}/5`):game.paused?'A moment of quiet.':game.puzzle?({curse:'Unwind the curse.',monster:'Steady your hands.',demon:'Reverse the ward.',chibi:'A fragment is calling.'}[game.puzzle.type]):game.parcel?`${SHAPES[game.parcel.shape].name} #${game.parcel.id}`:'Customer arriving…';
-  $('hint').textContent=isSanctuary?(!game.petAwakened?'Five fragments restore the sigil. Paw opportunities follow a 2 / 2 / 1 shift rhythm.':!game.pet.awakeningSeen&&mawhoundStatus==='ready'?'The sigil is becoming '+game.pet.name+'…':mawhoundStatus==='loading'?'Loading '+game.pet.name+'…':mawhoundStatus==='error'?game.pet.name+' could not load. Use Retry companion model.':`${game.pet.name} is ${mawhoundController?.behaviorLabel||'watching you'}. Sigil: ${game.sigilPieces}/5 toward the next level.`):isBackRoom?'Touch the purple bottle to visit the sanctuary. Touch the bed to sleep and begin your next shift.':game.puzzle?.type==='demon'?'Parcel locked · hold mouse / VR trigger to trace the spell':game.puzzle?.type==='monster'?'Parcel transformed · click the latch below its mouth while the needle is green':game.puzzle?.type==='curse'?'Parcel locked · hold a powder with mouse/grip · release over the parcel to pour':'Hover for tool descriptions · touch/click to activate · drag parcels to inspect';
+  $('hint').textContent=isSanctuary?(!game.petAwakened?'Five fragments restore the sigil. Paw opportunities follow a 2 / 2 / 1 shift rhythm.':!game.pet.awakeningSeen&&mawhoundStatus==='ready'?'The sigil is becoming '+game.pet.name+'…':mawhoundStatus==='loading'?'Loading '+game.pet.name+'…':mawhoundStatus==='error'?game.pet.name+' could not load. Use Retry companion model.':`Grip or hold-click your pet to move and place it. ${game.pet.name} is ${mawhoundController?.behaviorLabel||'watching you'}. Sigil: ${game.sigilPieces}/5 toward the next level.`):isBackRoom?'Touch the purple bottle to visit the sanctuary. Touch the bed to sleep and begin your next shift.':game.puzzle?.type==='demon'?'Parcel locked · hold mouse / VR trigger to trace the spell':game.puzzle?.type==='monster'?'Parcel transformed · click the latch below its mouth while the needle is green':game.puzzle?.type==='curse'?'Parcel locked · hold a powder with mouse/grip · release over the parcel to pour':'Hover for tool descriptions · touch/click to activate · drag parcels to inspect';
   $('save-status').textContent=storageNote||'Saves between shifts · stored on this device';
   const key=JSON.stringify([game.pet.id,game.phase,game.paused,game.parcel?.id,game.puzzle?.type,game.puzzle?.step,mawhoundStatus,mawhoundTricks,game.sigilPieces,game.petLevel,game.pet.awakeningSeen,game.save.upgrade,game.save.garden]);
   if(force||key!==lastUI){lastUI=key;options=menu();$('actions').replaceChildren();
@@ -330,12 +338,12 @@ function sync(force=false) {
 // Mouse/touch inspection and pointing.
 const ray=new THREE.Raycaster(), pointer=new THREE.Vector2();let drag=null;
 function pointerRay(e){const r=renderer.domElement.getBoundingClientRect();pointer.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);ray.setFromCamera(pointer,camera);}
-renderer.domElement.addEventListener('pointerdown',e=>{if(renderer.xr.isPresenting)return;pointerRay(e);if(wardGame.active&&!game.paused&&wardGame.begin('mouse',ray)){renderer.domElement.setPointerCapture(e.pointerId);drag=null;return;}if(powderGame.active&&!game.paused&&powderGame.grab('mouse',ray)){renderer.domElement.setPointerCapture(e.pointerId);drag=null;return;}const hit=ray.intersectObjects(worldTargets)[0];if(hit){invoke(hit.object.userData.run);return;}
+renderer.domElement.addEventListener('pointerdown',e=>{if(renderer.xr.isPresenting)return;pointerRay(e);if(petHandling.grab('mouse',ray)){renderer.domElement.setPointerCapture(e.pointerId);drag=null;return;}if(wardGame.active&&!game.paused&&wardGame.begin('mouse',ray)){renderer.domElement.setPointerCapture(e.pointerId);drag=null;return;}if(powderGame.active&&!game.paused&&powderGame.grab('mouse',ray)){renderer.domElement.setPointerCapture(e.pointerId);drag=null;return;}const hit=ray.intersectObjects(worldTargets)[0];if(hit){invoke(hit.object.userData.run);return;}
   if(game.phase==='shift'&&!game.paused&&!game.puzzle&&!toolsOnCounter.busy){drag={x:e.clientX,y:e.clientY};renderer.domElement.setPointerCapture(e.pointerId);}
 });
 renderer.domElement.addEventListener('pointerleave',()=>{mouseTool=null;});
-renderer.domElement.addEventListener('pointermove',e=>{if(!renderer.xr.isPresenting){pointerRay(e);if(wardGame.owner==='mouse'){wardGame.move('mouse',ray);return;}if(powderGame.owner==='mouse'){powderGame.moveMouse(ray);return;}mouseTool=ray.intersectObjects(worldTargets)[0]?.object||null;renderer.domElement.style.cursor=mouseTool?'pointer':'default';}if(drag&&!heldBy&&!game.puzzle&&!toolsOnCounter.busy){parcel.rotateOnWorldAxis(new THREE.Vector3(0,1,0),(e.clientX-drag.x)*.011);parcel.rotateOnWorldAxis(new THREE.Vector3(1,0,0),(e.clientY-drag.y)*.011);drag={x:e.clientX,y:e.clientY};}});
-renderer.domElement.addEventListener('pointerup',e=>{pointerRay(e);wardGame.move('mouse',ray);wardGame.end('mouse');powderGame.release('mouse',!game.paused&&ray.intersectObject(parcel,true).length>0);drag=null;});renderer.domElement.addEventListener('pointercancel',()=>{powderGame.cancel();wardGame.cancel();drag=null;});
+renderer.domElement.addEventListener('pointermove',e=>{if(!renderer.xr.isPresenting){pointerRay(e);if(petHandling.owner==='mouse'){petHandling.moveMouse(ray);return;}if(wardGame.owner==='mouse'){wardGame.move('mouse',ray);return;}if(powderGame.owner==='mouse'){powderGame.moveMouse(ray);return;}mouseTool=ray.intersectObjects(worldTargets)[0]?.object||null;renderer.domElement.style.cursor=mouseTool?'pointer':'default';}if(drag&&!heldBy&&!game.puzzle&&!toolsOnCounter.busy){parcel.rotateOnWorldAxis(new THREE.Vector3(0,1,0),(e.clientX-drag.x)*.011);parcel.rotateOnWorldAxis(new THREE.Vector3(1,0,0),(e.clientY-drag.y)*.011);drag={x:e.clientX,y:e.clientY};}});
+renderer.domElement.addEventListener('pointerup',e=>{pointerRay(e);petHandling.moveMouse(ray);petHandling.release('mouse');wardGame.move('mouse',ray);wardGame.end('mouse');powderGame.release('mouse',!game.paused&&ray.intersectObject(parcel,true).length>0);drag=null;});renderer.domElement.addEventListener('pointercancel',()=>{petHandling.release('mouse');powderGame.cancel();wardGame.cancel();drag=null;});
 renderer.domElement.addEventListener('wheel',e=>{if(game.phase==='shift'&&game.parcel&&!game.puzzle&&!renderer.xr.isPresenting&&!toolsOnCounter.busy){e.preventDefault();parcel.scale.setScalar(THREE.MathUtils.clamp(parcel.scale.x-e.deltaY*.001,.8,1.65));}},{passive:false});
 window.addEventListener('keydown',e=>{if($('guide').open||e.target.tagName==='BUTTON')return;if(e.code==='Space'){e.preventDefault();togglePause();}if(game.phase==='shift'&&!game.paused&&!game.puzzle&&!toolsOnCounter.busy){const k=e.key;if(k.startsWith('Arrow'))e.preventDefault();if(k==='ArrowLeft')parcel.rotateOnWorldAxis(new THREE.Vector3(0,1,0),-.2);if(k==='ArrowRight')parcel.rotateOnWorldAxis(new THREE.Vector3(0,1,0),.2);if(k==='ArrowUp')parcel.rotateOnWorldAxis(new THREE.Vector3(1,0,0),-.2);if(k==='ArrowDown')parcel.rotateOnWorldAxis(new THREE.Vector3(1,0,0),.2);if(k.toLowerCase()==='r')resetParcel();}});
 let guideWasPaused=false;
@@ -351,24 +359,26 @@ for(let i=0;i<2;i++){
   const line=new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3(0,0,-1)]),new THREE.LineBasicMaterial({color:'#dfc88b'}));line.scale.z=3;c.add(line);c.userData.line=line;
   ball(grip,0,0,0,.035,i===0?'#89b7c2':'#dbc28a',1,1,1.8);
   c.addEventListener('connected',e=>c.userData.source=e.data);
-  c.addEventListener('disconnected',()=>{if(wardGame.owner===c)wardGame.cancel();if(powderGame.owner===c)powderGame.cancel();if(heldBy===c)resetParcel();c.userData.source=null;});
+  c.addEventListener('disconnected',()=>{petHandling.release(c);if(wardGame.owner===c)wardGame.cancel();if(powderGame.owner===c)powderGame.cancel();if(heldBy===c)resetParcel();c.userData.source=null;});
   c.addEventListener('selectstart',()=>{controllerRay(c);if(wardGame.active&&!game.paused&&wardGame.begin(c,ray)){pulse(c);return;}const hit=ray.intersectObjects(worldTargets)[0];if(hit){invoke(hit.object.userData.run);pulse(c);}});
   c.addEventListener('selectend',()=>{controllerRay(c);wardGame.move(c,ray);wardGame.end(c);});
-  c.addEventListener('squeezestart',()=>{if(powderGame.active&&!game.paused){controllerRay(c);grip.getWorldPosition(pos);if(powderGame.grab(c,ray,pos))pulse(c);return;}if(game.puzzle)return;if(game.phase!=='shift'||game.paused||toolsOnCounter.busy||heldBy||!parcel.visible)return;controllerRay(c);grip.getWorldPosition(pos);if(ray.intersectObject(parcel,true).length||pos.distanceTo(parcel.getWorldPosition(direction))<.35){heldBy=c;grip.attach(parcel);parcel.position.set(0,.04,-.17);pulse(c);}});
-  c.addEventListener('squeezeend',()=>{if(powderGame.owner===c){if(game.paused)powderGame.cancel();else powderGame.release(c);return;}if(heldBy===c)resetParcel();});
+  c.addEventListener('squeezestart',()=>{controllerRay(c);if(petHandling.grab(c,ray,grip)){pulse(c);return;}if(powderGame.active&&!game.paused){controllerRay(c);grip.getWorldPosition(pos);if(powderGame.grab(c,ray,pos))pulse(c);return;}if(game.puzzle)return;if(game.phase!=='shift'||game.paused||toolsOnCounter.busy||heldBy||!parcel.visible)return;controllerRay(c);grip.getWorldPosition(pos);if(ray.intersectObject(parcel,true).length||pos.distanceTo(parcel.getWorldPosition(direction))<.35){heldBy=c;grip.attach(parcel);parcel.position.set(0,.04,-.17);pulse(c);}});
+  c.addEventListener('squeezeend',()=>{petHandling.release(c);if(powderGame.owner===c){if(game.paused)powderGame.cancel();else powderGame.release(c);return;}if(heldBy===c)resetParcel();});
 }
-function recenter(){if(toolsOnCounter.busy)return;powderGame.cancel();wardGame.cancel();if(!renderer.xr.isPresenting){game.message='Recenter is available while wearing a VR headset.';return;}const head=renderer.xr.getCamera();head.getWorldPosition(pos);head.getWorldDirection(direction);rig.worldToLocal(pos);const yaw=Math.atan2(-direction.x,-direction.z);rig.rotation.y-=yaw;pos.applyQuaternion(rig.quaternion);rig.position.set(-pos.x,1.65-pos.y,.75-pos.z);rig.updateMatrixWorld(true);resetParcel();}
+function recenter(){if(toolsOnCounter.busy)return;petHandling.cancel();powderGame.cancel();wardGame.cancel();if(!renderer.xr.isPresenting){game.message='Recenter is available while wearing a VR headset.';return;}const head=renderer.xr.getCamera();head.getWorldPosition(pos);head.getWorldDirection(direction);rig.worldToLocal(pos);const yaw=Math.atan2(-direction.x,-direction.z);rig.rotation.y-=yaw;pos.applyQuaternion(rig.quaternion);rig.position.set(-pos.x,1.65-pos.y,.75-pos.z);rig.updateMatrixWorld(true);resetParcel();}
 const vr=$('vr');
 async function checkVR(){if(!isSecureContext){vr.textContent='VR needs HTTPS';return;}if(!navigator.xr){vr.textContent='VR needs a headset';return;}try{const supported=await navigator.xr.isSessionSupported('immersive-vr');vr.disabled=!supported;vr.textContent=supported?'Enter VR':'VR not available';}catch{vr.textContent='VR unavailable';}}
 vr.onclick=async()=>{try{const current=renderer.xr.getSession();if(current){await current.end();return;}const session=await navigator.xr.requestSession('immersive-vr',{optionalFeatures:['local-floor']});await renderer.xr.setSession(session);vr.textContent='Exit VR';rig.position.set(0,0,.75);rig.rotation.set(0,0,0);session.addEventListener('visibilitychange',()=>{if(session.visibilityState!=='visible'&&game.phase==='shift'){game.paused=true;resetParcel();sync(true);}});}catch(e){$('error').hidden=false;$('error').textContent='Could not enter VR: '+e.message;}};
-renderer.xr.addEventListener('sessionend',()=>{powderGame.cancel();wardGame.cancel();rig.position.set(0,0,0);rig.rotation.set(0,0,0);camera.position.set(0,2.05,3.1);camera.lookAt(0,1.35,-1.5);resetParcel();if(game.phase==='shift')game.paused=true;vr.textContent='Enter VR';sync(true);resize();});
-document.addEventListener('visibilitychange',()=>{if(document.hidden&&game.phase==='shift'){game.paused=true;resetParcel();sync(true);}});
+renderer.xr.addEventListener('sessionend',()=>{petHandling.cancel();powderGame.cancel();wardGame.cancel();rig.position.set(0,0,0);rig.rotation.set(0,0,0);camera.position.set(0,2.05,3.1);camera.lookAt(0,1.35,-1.5);resetParcel();if(game.phase==='shift')game.paused=true;vr.textContent='Enter VR';sync(true);resize();});
+window.addEventListener('blur',()=>petHandling.cancel());
+document.addEventListener('visibilitychange',()=>{if(document.hidden)petHandling.cancel();if(document.hidden&&game.phase==='shift'){game.paused=true;resetParcel();sync(true);}});
 function resize(){const r=$('world').getBoundingClientRect();camera.aspect=r.width/r.height;camera.updateProjectionMatrix();renderer.setSize(r.width,r.height);}
 window.addEventListener('resize',resize);resize();checkVR();sync(true);
 let previous=0,uiClock=0;
 renderer.setAnimationLoop(ms=>{
   const dt=previous?Math.min((ms-previous)/1000,1):0;previous=ms;
   if(!game.paused)elapsed+=dt;
+  if(resetUntil&&performance.now()>resetUntil){resetUntil=0;paintReset();}petHandling.update(dt);
   const before=game.phase;if(!toolsOnCounter.busy&&!mimicGame.busy)game.tick(dt);if(before==='shift'&&game.phase==='summary'){save();sync(true);}
   uiClock+=dt;if(uiClock>.2){uiClock=0;sync();}
   if(game.puzzle?.type==='monster'){const needle=document.querySelector('.needle');if(needle)needle.style.left=`${timing()*100}%`;writeStatus();}
@@ -383,7 +393,7 @@ renderer.setAnimationLoop(ms=>{
       revealTime+=step;const revealDone=renderSigilAwakening(sigil,mawhoundController,elapsed,revealTime);
       if(revealDone){game.pet.awakeningSeen=true;sigil.root.visible=true;sigil.setAwakened(true);sigil.setPieces(game.sigilPieces);sigil.update(elapsed);mawhoundRoot.scale.setScalar(1);mawhoundController.setAutonomous(true);game.message=game.pet.name+' has awakened. Your companion is home.';save();updatePetBadge();sync(true);}
     }else sigil.update(elapsed);
-    if(game.petAwakened)mawhoundController?.update(step,{camera:renderer.xr.isPresenting?renderer.xr.getCamera():camera,needs:game.pet.needs});
+    if(game.petAwakened&&!petHandling.holding)mawhoundController?.update(step,{camera:renderer.xr.isPresenting?renderer.xr.getCamera():camera,needs:game.pet.needs});
   }
   const toolHover=renderer.xr.isPresenting?[]:[mouseTool];
   if(renderer.xr.isPresenting){for(const c of controllers){

@@ -25,7 +25,7 @@ export async function loadMawhound(){
     if(!brain.enabled){const desired=Math.atan2(local.x-root.position.x,local.z-root.position.z),delta=Math.atan2(Math.sin(desired-root.rotation.y),Math.cos(desired-root.rotation.y));root.rotation.y+=snap?delta:THREE.MathUtils.clamp(delta,-dt*2,dt*2);}
     root.updateWorldMatrix(true,true);aimMawhoundHead(head,viewerWorld,weight*current.getEffectiveWeight());
   }
-  return {root,clips:gltf.animations,get behaviorLabel(){return brain.label;},get autonomous(){return brain.enabled;},setRoamBounds(bounds){brain.bounds={...bounds};},setAutonomous(value){brain.setEnabled(value);},
+  return {root,clips:gltf.animations,get behaviorLabel(){return brain.label;},get autonomous(){return brain.enabled;},setRoamBounds(bounds){brain.bounds={...bounds};},setAutonomous(value){if(value){brain.x=root.position.x;brain.z=root.position.z;brain.heading=root.rotation.y;}brain.setEnabled(value);},
     play(name,{loop=false}={}){if(!actions.has(name))return false;if(brain.enabled)brain.command(name);else playClip(name,loop);return true;},
     react(need){brain.enabled?brain.react(need):playClip('Happy greeting');},
     pose(name,time,camera){const action=actions.get(name);if(!action)return;brain.setEnabled(false);mixer.stopAllAction();action.reset().setEffectiveWeight(1).setLoop(THREE.LoopOnce,1).play();action.clampWhenFinished=true;current=action;mixer.update(time);lookAtViewer(camera,0,true);},
