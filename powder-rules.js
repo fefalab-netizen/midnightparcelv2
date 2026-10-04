@@ -1,5 +1,6 @@
 export const POWDERS=[{name:'Cyan',color:'#1accdb'},{name:'Magenta',color:'#e0248c'},{name:'Yellow',color:'#f0c414'},{name:'White',color:'#f5ebd9'}];
 export function powderColor(counts){
+ counts=Array.from({length:4},(_,i)=>Number.isFinite(counts?.[i])?Math.max(0,counts[i]):0);
  const total=counts.reduce((a,b)=>a+b,0);if(!total)return '#847969';
  // Pigment absorption: cyan + yellow makes green, cyan + magenta makes blue.
  const pigments=[[.10,.80,.86],[.88,.14,.55],[.94,.77,.08],[.96,.92,.85]];

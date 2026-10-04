@@ -1,4 +1,4 @@
-import {createPowderRecipe} from './powder-rules.js';
+import {createPowderRecipe} from './powder-rules.js?v=0.13.2';
 import { SHAPES } from './shapes.js';
 export const TYPES = ['safe', 'curse', 'monster', 'demon', 'chibi'];
 export const DELIVERY_TIME=3.2, VISIT_TIME=7.2;
@@ -70,7 +70,18 @@ export class Game {
     this.message = { curse: 'Match the color splat. Hold a powder, move it over the parcel, and release to pour.', monster: 'MONSTER confirmed. Close three latches while the needle is in the center zone.', demon: 'DEMON confirmed. Hold and trace the glowing spell in front of the parcel, starting at the gold light.', chibi: 'SIGIL FRAGMENT confirmed. Soothe its echo: hum → offer food → open gently.' }[type];
     return true;
   }
+  ensurePuzzle(){
+    const p=this.puzzle;if(!p)return;
+    if(p.type==='demon'&&!['triangle','star','square'].includes(p.shape))p.shape='triangle';
+    if(p.type==='curse'){
+      const validCounts=v=>Array.isArray(v)&&v.length===4&&v.every(n=>Number.isInteger(n)&&n>=0);
+      if(!validCounts(p.recipe)||!validCounts(p.mixed)||!Number.isInteger(p.doses)||p.doses<1||typeof p.target!=='string'||p.recipe.reduce((a,b)=>a+b,0)!==p.doses||p.mixed.reduce((a,b)=>a+b,0)!==p.step||p.step>=p.doses){
+        this.puzzle=createPowderRecipe(this.save.shift,this.rng);this.message='Match the color splat. Hold a powder, move over the parcel, and release to pour.';
+      }
+    }
+  }
   pourPowder(index){
+    this.ensurePuzzle();
     if(this.phase!=='shift'||this.paused||this.puzzle?.type!=='curse'||!Number.isInteger(index)||index<0||index>3)return;
     const p=this.puzzle;p.mixed[index]++;p.step++;
     if(p.step===p.doses){if(p.mixed.every((n,i)=>n===p.recipe[i])){this.resolve(true);return true;}

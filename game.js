@@ -1,5 +1,5 @@
 import * as THREE from './vendor/three.module.js';
-import { Game, freshSave, validateSave } from './core.js';
+import { Game, freshSave, validateSave } from './core.js?v=0.13.2';
 import { SHAPES, markSurface, MARK_SIZE } from './shapes.js';
 import {dressParcel,parcelArtReady} from './parcel-art.js';
 import { createCustomer } from './customer.js';
@@ -247,7 +247,7 @@ function writeStatus() {
   c.fillText(game.phase==='sanctuary'?'POCKET SANCTUARY':`SHIFT ${game.save.shift-(game.phase==='summary'?1:0)}  /  ${formatTime(game.time)}  /  ${game.save.money} COINS`,30,65);
   c.fillStyle='#d3e5df';c.font='34px Arial';const words=(game.paused?'PAUSED. Touch the pause lever to resume.':game.message).split(' ');let line='',y=125;
   for(const word of words){if(c.measureText(line+word).width>950){c.fillText(line,30,y);y+=45;line='';}line+=word+' ';}c.fillText(line,30,y);
-  if(game.puzzle){c.fillStyle='#e9ca83';c.font='bold 33px Arial';c.fillText(game.puzzle.type==='demon'?`TRACE THE ${game.puzzle.shape.toUpperCase()}`:game.puzzle.type==='curse'?`POWDER ${game.puzzle.step} / ${game.puzzle.doses} DOSES`:`STEP ${game.puzzle.step+1} / 3`,30,310);}
+  if(game.puzzle){c.fillStyle='#e9ca83';c.font='bold 33px Arial';c.fillText(game.puzzle.type==='demon'?`TRACE THE ${(game.puzzle.shape||'ward').toUpperCase()}`:game.puzzle.type==='curse'?`POWDER ${game.puzzle.step} / ${game.puzzle.doses} DOSES`:`STEP ${game.puzzle.step+1} / 3`,30,310);}
   if(game.phase==='sanctuary'&&(!game.petAwakened||!game.pet.awakeningSeen)){c.fillStyle='#e9ca83';c.font='28px Arial';c.fillText(`${game.pet.name.toUpperCase()} SIGIL · ${game.sigilPieces} / 5 FRAGMENTS`,30,300);c.fillText('Rescue paw-marked parcels to restore the sigil.',30,343);}
   if(game.phase==='sanctuary'&&game.petAwakened&&game.pet.awakeningSeen){const pet=game.pet;c.fillStyle='#e9ca83';c.font='28px Arial';c.fillText(`${game.pet.name} · LEVEL ${game.petLevel} · SIGIL ${game.sigilPieces}/5`,30,300);c.fillText(`Fed ${pet.needs[0]} · Clean ${pet.needs[1]} · Rest ${pet.needs[2]}`,30,343);}
   if(game.puzzle?.type==='monster') {c.fillStyle='#3c5961';c.fillRect(250,290,650,35);c.fillStyle='#82a16a';c.fillRect(250+650*.35,290,650*.3,35);c.fillStyle='#fff5d9';c.fillRect(250+timing()*650,280,8,55);}
@@ -291,6 +291,7 @@ function menu() {
   return [o('Approve & ship',()=>toolsOnCounter.activate('stamp'),'Stamp only an ordinary parcel.',true),o('Curse powder',()=>toolsOnCounter.activate('curse'),'Spiral seal · unlimited powder'),o('Monster bait',()=>toolsOnCounter.activate('monster'),'Claw marks · unlimited bait'),o('Demon ward',()=>toolsOnCounter.activate('demon'),'Triangle eye · unlimited wards'),o('Sigil bell',()=>toolsOnCounter.activate('chibi'),'Paw print · recover a sigil fragment')];
 }
 function sync(force=false) {
+  game.ensurePuzzle();
   if(parcelId!==game.parcel?.id){parcelId=game.parcel?.id;buildParcel();}
   powderGame.sync(game.puzzle?.type==='curse'?game.puzzle:null,game.parcel?SHAPES[game.parcel.shape]:null);wardGame.sync(game.puzzle?.type==='demon'?game.puzzle:null,game.parcel?SHAPES[game.parcel.shape].depth:0);if(game.paused){powderGame.cancel();wardGame.cancel();}
   const isSanctuary=game.phase==='sanctuary';
