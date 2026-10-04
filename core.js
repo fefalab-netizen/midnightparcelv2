@@ -66,8 +66,8 @@ export class Game {
     if (type !== this.parcel.type) { this.message = 'No reaction. That test cost time. Inspect another face.'; return false; }
     this.parcel.confirmed = true;
     const sequence = type === 'curse' ? [0, 1, 2] : type === 'demon' ? [2, 1, 0] : type === 'chibi' ? [1, 0, 2] : [0, 0, 0];
-    this.puzzle = type==='curse'?createPowderRecipe(this.save.shift,this.rng):{ type, step: 0, sequence };
-    this.message = { curse: 'Match the color splat. Hold a powder, move it over the parcel, and release to pour.', monster: 'MONSTER confirmed. Close three latches while the needle is in the center zone.', demon: 'DEMON confirmed. Reverse the ward: III → II → I.', chibi: 'SIGIL FRAGMENT confirmed. Soothe its echo: hum → offer food → open gently.' }[type];
+    this.puzzle = type==='curse'?createPowderRecipe(this.save.shift,this.rng):type==='demon'?{type,step:0,shape:['triangle','star','square'][Math.floor(this.rng()*3)]}:{ type, step: 0, sequence };
+    this.message = { curse: 'Match the color splat. Hold a powder, move it over the parcel, and release to pour.', monster: 'MONSTER confirmed. Close three latches while the needle is in the center zone.', demon: 'DEMON confirmed. Hold and trace the glowing spell in front of the parcel, starting at the gold light.', chibi: 'SIGIL FRAGMENT confirmed. Soothe its echo: hum → offer food → open gently.' }[type];
     return true;
   }
   pourPowder(index){
@@ -78,8 +78,9 @@ export class Game {
     this.message='Powder mixed: '+p.step+' / '+p.doses+' doses. Match the target splat.';return true;
   }
   resetPowder(){if(this.phase==='shift'&&!this.paused&&this.puzzle?.type==='curse'){this.puzzle.mixed=[0,0,0,0];this.puzzle.step=0;this.message='Mix cleared. Match the same target splat.';}}
+  completeWard(puzzle){if(this.phase!=='shift'||this.paused||this.puzzle!==puzzle||puzzle?.type!=='demon')return false;this.resolve(true);return true;}
   act(index, inZone = false) {
-    if (this.phase !== 'shift' || this.paused || !this.puzzle || this.puzzle.type==='curse') return;
+    if (this.phase !== 'shift' || this.paused || !this.puzzle || ['curse','demon'].includes(this.puzzle.type)) return;
     const p = this.puzzle;
     if (index !== p.sequence[p.step] || (p.type === 'monster' && !inZone)) { this.spend(4); if (this.phase === 'shift') this.message = 'The ward slipped. Four seconds lost; try this step again.'; return false; }
     p.step++;

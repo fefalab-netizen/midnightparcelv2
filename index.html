@@ -16,7 +16,7 @@
  window.addEventListener('error',function(e){if(e.message)failed(e.message);});
  const timer=setTimeout(function(){if(!started){message.textContent='The shop is taking longer than expected to load.';error.hidden=false;error.textContent='Still loading game scripts. Check your connection and confirm that all library and game JavaScript files were uploaded.';}},20000);
  if(location.protocol==='file:'){failed('Open the published HTTPS site, or run the included local server; opening index.html directly cannot load the game.');return;}
- import('./game.js?v=0.12.0').then(function(){started=true;clearTimeout(timer);}).catch(function(e){failed(e.message||String(e));});
+ import('./game.js?v=0.13.0').then(function(){started=true;clearTimeout(timer);}).catch(function(e){failed(e.message||String(e));});
 })();
 </script>
 </body></html>

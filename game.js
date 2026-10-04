@@ -8,6 +8,7 @@ import {loadCardboardImp} from './cardboard-imp.js';
 import {loadMawhound} from './mawhound.js';
 import {createMawhoundSigil,renderSigilAwakening} from './sigil.js';
 
+import {createWardGame} from './ward-game.js';
 import {createPowderGame} from './powder-game.js';
 import {createCounterTools} from './counter-tools.js';
 import {createBackRoom} from './back-room.js';
@@ -162,11 +163,12 @@ function selectCompanion(id){if(!game.selectPet(id))return;revealTime=-1;mawhoun
 // Parcel meshes and decals are rebuilt only when a parcel changes.
 const parcel = new THREE.Group();scene.add(parcel);
 const powderGame=createPowderGame({parcel,onPour:index=>invoke(()=>tone(game.pourPowder(index)))});scene.add(powderGame.root);
+const wardGame=createWardGame({parcel,onComplete:puzzle=>invoke(()=>tone(game.completeWard(puzzle)))});scene.add(wardGame.root);
 const parcelHome=new THREE.Vector3(-.12,1.51,-.48);
 function disposeGroup(group) {
   for(const child of [...group.children]) {group.remove(child);child.traverse(o=>{if(!o.userData.sharedGeometry)o.geometry?.dispose();if(o.material&&!o.material.userData.shared){if(!o.material.map?.userData.shared)o.material.map?.dispose();o.material.dispose();}});}
 }
-function resetParcel() { if(heldBy)heldBy=null;scene.attach(parcel);parcel.position.copy(parcelHome);parcel.rotation.set(.08,-.28,0);if(game.puzzle?.type==='curse')parcel.rotation.set(0,0,0);parcel.scale.setScalar(1); }
+function resetParcel() { if(heldBy)heldBy=null;scene.attach(parcel);parcel.position.copy(parcelHome);parcel.rotation.set(.08,-.28,0);if(['curse','demon'].includes(game.puzzle?.type))parcel.rotation.set(0,0,0);parcel.scale.setScalar(1); }
 function markTexture(type) {
   const c=document.createElement('canvas');c.width=c.height=128;const ctx=c.getContext('2d');ctx.strokeStyle=ctx.fillStyle={curse:'#773c9c',monster:'#733132',demon:'#a53954',chibi:'#355e56'}[type];ctx.lineCap='round';ctx.lineWidth=8;
   if(type==='curse'){ctx.beginPath();for(let i=0;i<95;i++){const a=i/9,r=3+i*.44;const x=64+Math.cos(a)*r,y=64+Math.sin(a)*r;i?ctx.lineTo(x,y):ctx.moveTo(x,y);}ctx.stroke();}
@@ -245,7 +247,7 @@ function writeStatus() {
   c.fillText(game.phase==='sanctuary'?'POCKET SANCTUARY':`SHIFT ${game.save.shift-(game.phase==='summary'?1:0)}  /  ${formatTime(game.time)}  /  ${game.save.money} COINS`,30,65);
   c.fillStyle='#d3e5df';c.font='34px Arial';const words=(game.paused?'PAUSED. Touch the pause lever to resume.':game.message).split(' ');let line='',y=125;
   for(const word of words){if(c.measureText(line+word).width>950){c.fillText(line,30,y);y+=45;line='';}line+=word+' ';}c.fillText(line,30,y);
-  if(game.puzzle){c.fillStyle='#e9ca83';c.font='bold 33px Arial';c.fillText(game.puzzle.type==='curse'?`POWDER ${game.puzzle.step} / ${game.puzzle.doses} DOSES`:`STEP ${game.puzzle.step+1} / 3`,30,310);}
+  if(game.puzzle){c.fillStyle='#e9ca83';c.font='bold 33px Arial';c.fillText(game.puzzle.type==='demon'?`TRACE THE ${game.puzzle.shape.toUpperCase()}`:game.puzzle.type==='curse'?`POWDER ${game.puzzle.step} / ${game.puzzle.doses} DOSES`:`STEP ${game.puzzle.step+1} / 3`,30,310);}
   if(game.phase==='sanctuary'&&(!game.petAwakened||!game.pet.awakeningSeen)){c.fillStyle='#e9ca83';c.font='28px Arial';c.fillText(`${game.pet.name.toUpperCase()} SIGIL · ${game.sigilPieces} / 5 FRAGMENTS`,30,300);c.fillText('Rescue paw-marked parcels to restore the sigil.',30,343);}
   if(game.phase==='sanctuary'&&game.petAwakened&&game.pet.awakeningSeen){const pet=game.pet;c.fillStyle='#e9ca83';c.font='28px Arial';c.fillText(`${game.pet.name} · LEVEL ${game.petLevel} · SIGIL ${game.sigilPieces}/5`,30,300);c.fillText(`Fed ${pet.needs[0]} · Clean ${pet.needs[1]} · Rest ${pet.needs[2]}`,30,343);}
   if(game.puzzle?.type==='monster') {c.fillStyle='#3c5961';c.fillRect(250,290,650,35);c.fillStyle='#82a16a';c.fillRect(250+650*.35,290,650*.3,35);c.fillStyle='#fff5d9';c.fillRect(250+timing()*650,280,8,55);}
@@ -261,7 +263,7 @@ function invoke(fn){const previous=game.phase;fn();if(game.phase==='summary'&&pr
 function start(){game.start();tone();}
 function closeShift(){if(!toolsOnCounter.busy)invoke(()=>game.close());}
 function togglePause(){if(game.phase==='shift'&&!toolsOnCounter.busy){game.paused=!game.paused;resetParcel();sync(true);}}
-function test(type){const ok=game.test(type);if(ok&&type==='curse'){resetParcel();drag=null;}tone(ok);}
+function test(type){const ok=game.test(type);if(ok&&['curse','demon'].includes(type)){resetParcel();drag=null;}tone(ok);}
 function act(i){if(toolsOnCounter.busy)return;const value=timing();tone(game.act(i,value>=.35&&value<=.65));}
 function goBackRoom(){game.backRoom();mawhoundTricks=false;tone();}
 function sleepAndStart(){if(!['backroom','summary'].includes(game.phase))return;save();start();}
@@ -283,13 +285,14 @@ function menu() {
   }
   if(game.paused)return [o('Resume shift',togglePause,'The clock is stopped.',true)];
   if(!game.parcel)return [];
+  if(game.puzzle?.type==='demon')return [o('Restart spell',()=>wardGame.cancel(),'Hold mouse button or VR trigger and trace from the gold light.')];
   if(game.puzzle?.type==='curse')return [o('Clear powder mix',()=>{if(!powderGame.busy&&!powderGame.owner)game.resetPowder();},'Hold a colored powder and release it over the parcel.')];
   if(game.puzzle){const type=game.puzzle.type;const labels=type==='chibi'?['Offer food','Hum softly','Open gently']:type==='monster'?['Close latch']:['Seal I','Seal II','Seal III'];return labels.map((l,i)=>o(l,()=>act(i),'',i===0));}
   return [o('Approve & ship',()=>toolsOnCounter.activate('stamp'),'Stamp only an ordinary parcel.',true),o('Curse powder',()=>toolsOnCounter.activate('curse'),'Spiral seal · unlimited powder'),o('Monster bait',()=>toolsOnCounter.activate('monster'),'Claw marks · unlimited bait'),o('Demon ward',()=>toolsOnCounter.activate('demon'),'Triangle eye · unlimited wards'),o('Sigil bell',()=>toolsOnCounter.activate('chibi'),'Paw print · recover a sigil fragment')];
 }
 function sync(force=false) {
   if(parcelId!==game.parcel?.id){parcelId=game.parcel?.id;buildParcel();}
-  powderGame.sync(game.puzzle?.type==='curse'?game.puzzle:null,game.parcel?SHAPES[game.parcel.shape]:null);if(game.paused)powderGame.cancel();
+  powderGame.sync(game.puzzle?.type==='curse'?game.puzzle:null,game.parcel?SHAPES[game.parcel.shape]:null);wardGame.sync(game.puzzle?.type==='demon'?game.puzzle:null,game.parcel?SHAPES[game.parcel.shape].depth:0);if(game.paused){powderGame.cancel();wardGame.cancel();}
   const isSanctuary=game.phase==='sanctuary';
   const isBackRoom=['summary','backroom'].includes(game.phase),mode=isSanctuary?'sanctuary':isBackRoom?'backroom':'shop';
   if(sceneMode!==mode){
@@ -303,7 +306,7 @@ function sync(force=false) {
   $('shift').textContent=String(game.save.shift-(game.phase==='summary'?1:0)).padStart(2,'0');$('timer').textContent=game.phase==='shift'?formatTime(game.time):'—';$('money').textContent=game.save.money;
   $('message').textContent=game.paused?'The clock is stopped. Take your time.':game.message;
   $('title').textContent=game.phase==='lobby'?'Welcome, custodian.':isBackRoom?'The night is yours.':isSanctuary?(game.petAwakened&&game.pet.awakeningSeen?`${game.pet.name} · Level ${game.petLevel}`:`${game.pet.name} sigil · ${game.sigilPieces}/5`):game.paused?'A moment of quiet.':game.puzzle?({curse:'Unwind the curse.',monster:'Steady your hands.',demon:'Reverse the ward.',chibi:'A fragment is calling.'}[game.puzzle.type]):game.parcel?`${SHAPES[game.parcel.shape].name} #${game.parcel.id}`:'Customer arriving…';
-  $('hint').textContent=isSanctuary?(!game.petAwakened?'Five fragments restore the sigil. Paw opportunities follow a 2 / 2 / 1 shift rhythm.':!game.pet.awakeningSeen&&mawhoundStatus==='ready'?'The sigil is becoming '+game.pet.name+'…':mawhoundStatus==='loading'?'Loading '+game.pet.name+'…':mawhoundStatus==='error'?game.pet.name+' could not load. Use Retry companion model.':`${game.pet.name} is ${mawhoundController?.behaviorLabel||'watching you'}. Sigil: ${game.sigilPieces}/5 toward the next level.`):isBackRoom?'Touch the purple bottle to visit the sanctuary. Touch the bed to sleep and begin your next shift.':game.puzzle?.type==='curse'?'Parcel locked · hold a powder with mouse/grip · release over the parcel to pour':'Hover for tool descriptions · touch/click to activate · drag parcels to inspect';
+  $('hint').textContent=isSanctuary?(!game.petAwakened?'Five fragments restore the sigil. Paw opportunities follow a 2 / 2 / 1 shift rhythm.':!game.pet.awakeningSeen&&mawhoundStatus==='ready'?'The sigil is becoming '+game.pet.name+'…':mawhoundStatus==='loading'?'Loading '+game.pet.name+'…':mawhoundStatus==='error'?game.pet.name+' could not load. Use Retry companion model.':`${game.pet.name} is ${mawhoundController?.behaviorLabel||'watching you'}. Sigil: ${game.sigilPieces}/5 toward the next level.`):isBackRoom?'Touch the purple bottle to visit the sanctuary. Touch the bed to sleep and begin your next shift.':game.puzzle?.type==='demon'?'Parcel locked · hold mouse / VR trigger to trace the spell':game.puzzle?.type==='curse'?'Parcel locked · hold a powder with mouse/grip · release over the parcel to pour':'Hover for tool descriptions · touch/click to activate · drag parcels to inspect';
   $('save-status').textContent=storageNote||'Saves between shifts · stored on this device';
   const key=JSON.stringify([game.pet.id,game.phase,game.paused,game.parcel?.id,game.puzzle?.type,game.puzzle?.step,mawhoundStatus,mawhoundTricks,game.sigilPieces,game.petLevel,game.pet.awakeningSeen,game.save.upgrade,game.save.garden]);
   if(force||key!==lastUI){lastUI=key;options=menu();$('actions').replaceChildren();
@@ -311,7 +314,7 @@ function sync(force=false) {
     $('utilities').replaceChildren();
     if(game.phase==='shift'){for(const [label,fn] of [[game.paused?'Resume':'Pause',togglePause],['Close early',closeShift],['Reset parcel',resetParcel]]){const b=document.createElement('button');b.textContent=label;b.onclick=()=>invoke(fn);$('utilities').appendChild(b);}}
     $('puzzle-progress').replaceChildren();
-    if(game.puzzle){const p=document.createElement('div');p.textContent=game.puzzle.type==='curse'?`Match the splat · ${game.puzzle.step}/${game.puzzle.doses} doses · hold, move, release`:`Step ${game.puzzle.step+1} of 3 · `+({curse:'I → II → III',demon:'III → II → I',chibi:'Hum → food → open',monster:'Latch in the center zone'}[game.puzzle.type]);$('puzzle-progress').appendChild(p);if(game.puzzle.type==='monster'){const meter=document.createElement('div');meter.className='timing';const needle=document.createElement('div');needle.className='needle';meter.appendChild(needle);$('puzzle-progress').appendChild(meter);}}
+    if(game.puzzle){const p=document.createElement('div');p.textContent=game.puzzle.type==='demon'?`Trace the ${game.puzzle.shape} · hold mouse / VR trigger · start at the gold light`:game.puzzle.type==='curse'?`Match the splat · ${game.puzzle.step}/${game.puzzle.doses} doses · hold, move, release`:`Step ${game.puzzle.step+1} of 3 · `+({curse:'I → II → III',demon:'III → II → I',chibi:'Hum → food → open',monster:'Latch in the center zone'}[game.puzzle.type]);$('puzzle-progress').appendChild(p);if(game.puzzle.type==='monster'){const meter=document.createElement('div');meter.className='timing';const needle=document.createElement('div');needle.className='needle';meter.appendChild(needle);$('puzzle-progress').appendChild(meter);}}
     if(isSanctuary&&game.petAwakened&&game.pet.awakeningSeen){const p=document.createElement('div');p.className='pet-needs';const pet=game.pet;pet.needs.forEach((v,i)=>{const row=document.createElement('div');row.textContent=`${['Fed','Clean','Rested','Playful','Loved'][i]}: ${v}%`;p.appendChild(row);});$('puzzle-progress').appendChild(p);}
     {const p=document.createElement('div');p.textContent=`${game.pet.name} sigil: ${game.sigilPieces} / 5 · ${game.petAwakened?'restore to gain a level':'restore to awaken'}${game.phase==='shift'?' · saves at shift end':''}`;$('puzzle-progress').appendChild(p);}
     buildButtons();
@@ -321,16 +324,16 @@ function sync(force=false) {
 // Mouse/touch inspection and pointing.
 const ray=new THREE.Raycaster(), pointer=new THREE.Vector2();let drag=null;
 function pointerRay(e){const r=renderer.domElement.getBoundingClientRect();pointer.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);ray.setFromCamera(pointer,camera);}
-renderer.domElement.addEventListener('pointerdown',e=>{if(renderer.xr.isPresenting)return;pointerRay(e);if(powderGame.active&&!game.paused&&powderGame.grab('mouse',ray)){renderer.domElement.setPointerCapture(e.pointerId);drag=null;return;}const hit=ray.intersectObjects(worldTargets)[0];if(hit){invoke(hit.object.userData.run);return;}
+renderer.domElement.addEventListener('pointerdown',e=>{if(renderer.xr.isPresenting)return;pointerRay(e);if(wardGame.active&&!game.paused&&wardGame.begin('mouse',ray)){renderer.domElement.setPointerCapture(e.pointerId);drag=null;return;}if(powderGame.active&&!game.paused&&powderGame.grab('mouse',ray)){renderer.domElement.setPointerCapture(e.pointerId);drag=null;return;}const hit=ray.intersectObjects(worldTargets)[0];if(hit){invoke(hit.object.userData.run);return;}
   if(game.phase==='shift'&&!game.paused&&!game.puzzle&&!toolsOnCounter.busy){drag={x:e.clientX,y:e.clientY};renderer.domElement.setPointerCapture(e.pointerId);}
 });
 renderer.domElement.addEventListener('pointerleave',()=>{mouseTool=null;});
-renderer.domElement.addEventListener('pointermove',e=>{if(!renderer.xr.isPresenting){pointerRay(e);if(powderGame.owner==='mouse'){powderGame.moveMouse(ray);return;}mouseTool=ray.intersectObjects(worldTargets)[0]?.object||null;renderer.domElement.style.cursor=mouseTool?'pointer':'default';}if(drag&&!heldBy&&!game.puzzle&&!toolsOnCounter.busy){parcel.rotateOnWorldAxis(new THREE.Vector3(0,1,0),(e.clientX-drag.x)*.011);parcel.rotateOnWorldAxis(new THREE.Vector3(1,0,0),(e.clientY-drag.y)*.011);drag={x:e.clientX,y:e.clientY};}});
-renderer.domElement.addEventListener('pointerup',e=>{pointerRay(e);powderGame.release('mouse',!game.paused&&ray.intersectObject(parcel,true).length>0);drag=null;});renderer.domElement.addEventListener('pointercancel',()=>{powderGame.cancel();drag=null;});
+renderer.domElement.addEventListener('pointermove',e=>{if(!renderer.xr.isPresenting){pointerRay(e);if(wardGame.owner==='mouse'){wardGame.move('mouse',ray);return;}if(powderGame.owner==='mouse'){powderGame.moveMouse(ray);return;}mouseTool=ray.intersectObjects(worldTargets)[0]?.object||null;renderer.domElement.style.cursor=mouseTool?'pointer':'default';}if(drag&&!heldBy&&!game.puzzle&&!toolsOnCounter.busy){parcel.rotateOnWorldAxis(new THREE.Vector3(0,1,0),(e.clientX-drag.x)*.011);parcel.rotateOnWorldAxis(new THREE.Vector3(1,0,0),(e.clientY-drag.y)*.011);drag={x:e.clientX,y:e.clientY};}});
+renderer.domElement.addEventListener('pointerup',e=>{pointerRay(e);wardGame.move('mouse',ray);wardGame.end('mouse');powderGame.release('mouse',!game.paused&&ray.intersectObject(parcel,true).length>0);drag=null;});renderer.domElement.addEventListener('pointercancel',()=>{powderGame.cancel();wardGame.cancel();drag=null;});
 renderer.domElement.addEventListener('wheel',e=>{if(game.phase==='shift'&&game.parcel&&!game.puzzle&&!renderer.xr.isPresenting&&!toolsOnCounter.busy){e.preventDefault();parcel.scale.setScalar(THREE.MathUtils.clamp(parcel.scale.x-e.deltaY*.001,.8,1.65));}},{passive:false});
 window.addEventListener('keydown',e=>{if($('guide').open||e.target.tagName==='BUTTON')return;if(e.code==='Space'){e.preventDefault();togglePause();}if(game.phase==='shift'&&!game.paused&&!game.puzzle&&!toolsOnCounter.busy){const k=e.key;if(k.startsWith('Arrow'))e.preventDefault();if(k==='ArrowLeft')parcel.rotateOnWorldAxis(new THREE.Vector3(0,1,0),-.2);if(k==='ArrowRight')parcel.rotateOnWorldAxis(new THREE.Vector3(0,1,0),.2);if(k==='ArrowUp')parcel.rotateOnWorldAxis(new THREE.Vector3(1,0,0),-.2);if(k==='ArrowDown')parcel.rotateOnWorldAxis(new THREE.Vector3(1,0,0),.2);if(k.toLowerCase()==='r')resetParcel();}});
 let guideWasPaused=false;
-function showGuide(){powderGame.cancel();guideWasPaused=game.paused;if(game.phase==='shift')game.paused=true;$('guide').showModal();sync(true);}
+function showGuide(){powderGame.cancel();wardGame.cancel();guideWasPaused=game.paused;if(game.phase==='shift')game.paused=true;$('guide').showModal();sync(true);}
 $('help').onclick=showGuide;$('close-guide').onclick=()=>$('guide').close();$('guide').addEventListener('close',()=>{if(game.phase==='shift')game.paused=guideWasPaused;sync(true);});
 $('sound').onclick=()=>{sound=!sound;$('sound').textContent=sound?'Sound on':'Sound off';$('sound').setAttribute('aria-pressed',String(sound));tone();};
 // Two controller rays, either-hand grip pickup, tracking-loss recovery.
@@ -342,16 +345,17 @@ for(let i=0;i<2;i++){
   const line=new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3(0,0,-1)]),new THREE.LineBasicMaterial({color:'#dfc88b'}));line.scale.z=3;c.add(line);c.userData.line=line;
   ball(grip,0,0,0,.035,i===0?'#89b7c2':'#dbc28a',1,1,1.8);
   c.addEventListener('connected',e=>c.userData.source=e.data);
-  c.addEventListener('disconnected',()=>{if(powderGame.owner===c)powderGame.cancel();if(heldBy===c)resetParcel();c.userData.source=null;});
-  c.addEventListener('selectstart',()=>{controllerRay(c);const hit=ray.intersectObjects(worldTargets)[0];if(hit){invoke(hit.object.userData.run);pulse(c);}});
+  c.addEventListener('disconnected',()=>{if(wardGame.owner===c)wardGame.cancel();if(powderGame.owner===c)powderGame.cancel();if(heldBy===c)resetParcel();c.userData.source=null;});
+  c.addEventListener('selectstart',()=>{controllerRay(c);if(wardGame.active&&!game.paused&&wardGame.begin(c,ray)){pulse(c);return;}const hit=ray.intersectObjects(worldTargets)[0];if(hit){invoke(hit.object.userData.run);pulse(c);}});
+  c.addEventListener('selectend',()=>{controllerRay(c);wardGame.move(c,ray);wardGame.end(c);});
   c.addEventListener('squeezestart',()=>{if(powderGame.active&&!game.paused){controllerRay(c);grip.getWorldPosition(pos);if(powderGame.grab(c,ray,pos))pulse(c);return;}if(game.puzzle)return;if(game.phase!=='shift'||game.paused||toolsOnCounter.busy||heldBy||!parcel.visible)return;controllerRay(c);grip.getWorldPosition(pos);if(ray.intersectObject(parcel,true).length||pos.distanceTo(parcel.getWorldPosition(direction))<.35){heldBy=c;grip.attach(parcel);parcel.position.set(0,.04,-.17);pulse(c);}});
   c.addEventListener('squeezeend',()=>{if(powderGame.owner===c){if(game.paused)powderGame.cancel();else powderGame.release(c);return;}if(heldBy===c)resetParcel();});
 }
-function recenter(){if(toolsOnCounter.busy)return;powderGame.cancel();if(!renderer.xr.isPresenting){game.message='Recenter is available while wearing a VR headset.';return;}const head=renderer.xr.getCamera();head.getWorldPosition(pos);head.getWorldDirection(direction);rig.worldToLocal(pos);const yaw=Math.atan2(-direction.x,-direction.z);rig.rotation.y-=yaw;pos.applyQuaternion(rig.quaternion);rig.position.set(-pos.x,1.65-pos.y,.75-pos.z);rig.updateMatrixWorld(true);resetParcel();}
+function recenter(){if(toolsOnCounter.busy)return;powderGame.cancel();wardGame.cancel();if(!renderer.xr.isPresenting){game.message='Recenter is available while wearing a VR headset.';return;}const head=renderer.xr.getCamera();head.getWorldPosition(pos);head.getWorldDirection(direction);rig.worldToLocal(pos);const yaw=Math.atan2(-direction.x,-direction.z);rig.rotation.y-=yaw;pos.applyQuaternion(rig.quaternion);rig.position.set(-pos.x,1.65-pos.y,.75-pos.z);rig.updateMatrixWorld(true);resetParcel();}
 const vr=$('vr');
 async function checkVR(){if(!isSecureContext){vr.textContent='VR needs HTTPS';return;}if(!navigator.xr){vr.textContent='VR needs a headset';return;}try{const supported=await navigator.xr.isSessionSupported('immersive-vr');vr.disabled=!supported;vr.textContent=supported?'Enter VR':'VR not available';}catch{vr.textContent='VR unavailable';}}
 vr.onclick=async()=>{try{const current=renderer.xr.getSession();if(current){await current.end();return;}const session=await navigator.xr.requestSession('immersive-vr',{optionalFeatures:['local-floor']});await renderer.xr.setSession(session);vr.textContent='Exit VR';rig.position.set(0,0,.75);rig.rotation.set(0,0,0);session.addEventListener('visibilitychange',()=>{if(session.visibilityState!=='visible'&&game.phase==='shift'){game.paused=true;resetParcel();sync(true);}});}catch(e){$('error').hidden=false;$('error').textContent='Could not enter VR: '+e.message;}};
-renderer.xr.addEventListener('sessionend',()=>{powderGame.cancel();rig.position.set(0,0,0);rig.rotation.set(0,0,0);camera.position.set(0,2.05,3.1);camera.lookAt(0,1.35,-1.5);resetParcel();if(game.phase==='shift')game.paused=true;vr.textContent='Enter VR';sync(true);resize();});
+renderer.xr.addEventListener('sessionend',()=>{powderGame.cancel();wardGame.cancel();rig.position.set(0,0,0);rig.rotation.set(0,0,0);camera.position.set(0,2.05,3.1);camera.lookAt(0,1.35,-1.5);resetParcel();if(game.phase==='shift')game.paused=true;vr.textContent='Enter VR';sync(true);resize();});
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&game.phase==='shift'){game.paused=true;resetParcel();sync(true);}});
 function resize(){const r=$('world').getBoundingClientRect();camera.aspect=r.width/r.height;camera.updateProjectionMatrix();renderer.setSize(r.width,r.height);}
 window.addEventListener('resize',resize);resize();checkVR();sync(true);
@@ -378,8 +382,8 @@ renderer.setAnimationLoop(ms=>{
   const toolHover=renderer.xr.isPresenting?[]:[mouseTool];
   if(renderer.xr.isPresenting){for(const c of controllers){
     if(c.userData.source){powderGame.moveGrip(c,c.userData.grip);c.userData.grip.getWorldPosition(pos);const target=backRoom.root.visible?backRoom.touch(pos):sanctuaryMode?outdoorSanctuary.touch(pos):room.visible?toolsOnCounter.touch(pos):null;if(target)toolHover.push(target);if(target&&target!==c.userData.lastTouch){invoke(target.userData.run);pulse(c);}c.userData.lastTouch=target;}
-    controllerRay(c);const hit=ray.intersectObjects(worldTargets)[0];if(hit)toolHover.push(hit.object);c.userData.line.scale.z=hit?hit.distance:2.5;c.userData.line.material.color.set(hit?'#a8e6ad':'#dfc88b');}}
-  if(!game.paused)powderGame.update(Math.min(dt,.05));
+    controllerRay(c);if(!game.paused)wardGame.move(c,ray);const hit=ray.intersectObjects(worldTargets)[0];if(hit)toolHover.push(hit.object);c.userData.line.scale.z=hit?hit.distance:2.5;c.userData.line.material.color.set(hit?'#a8e6ad':'#dfc88b');}}
+  if(!game.paused){powderGame.update(Math.min(dt,.05));wardGame.update(Math.min(dt,.05));}
   toolsOnCounter.setHover(toolHover);toolsOnCounter.update(Math.min(dt,.05));
   renderer.render(scene,camera);
 });
