@@ -1,4 +1,4 @@
-import {createPowderRecipe} from './powder-rules.js?v=0.13.2';
+import {createPowderRecipe,POWDERS} from './powder-rules.js?v=0.13.3';
 import { SHAPES } from './shapes.js';
 export const TYPES = ['safe', 'curse', 'monster', 'demon', 'chibi'];
 export const DELIVERY_TIME=3.2, VISIT_TIME=7.2;
@@ -9,28 +9,30 @@ export function mawhound(level=1,needs=[55,55,55,55,55]){return {name:'Mawhound'
 export function random(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 export const SIGIL_PARTS=5;
 export function pawSchedule(shift){return shift%3===0?[100]:[45,155];}
-export const PETS=[{id:'imp',name:'Cardboard Imp'},{id:'mawhound',name:'Mawhound'}];
+export const PETS=[{id:'imp',name:'Cardboard Imp'},{id:'otty',name:'Otty'},{id:'mawhound',name:'Mawhound'}];
 function petRecord(spec){return {...spec,level:1,needs:[55,55,55,55,55],sigilFragments:0,awakeningSeen:false};}
-export function freshSave(){return {version:4,selectedPet:'imp',shift:1,money:0,pets:PETS.map(petRecord),upgrade:false,garden:false,best:0};}
+export function freshSave(){return {version:5,mawhoundRewardUnlocked:false,selectedPet:'imp',shift:1,money:0,pets:PETS.map(petRecord),upgrade:false,garden:false,best:0};}
 export function validateSave(raw){
- if(!raw||![1,2,3,4].includes(raw.version)||!Number.isInteger(raw.shift)||raw.shift<1||raw.shift>100000||!Number.isFinite(raw.money)||raw.money<0||raw.money>1e9||!Array.isArray(raw.pets)||raw.pets.length>1000)throw Error('Invalid save');
+ if(!raw||![1,2,3,4,5].includes(raw.version)||!Number.isInteger(raw.shift)||raw.shift<1||raw.shift>100000||!Number.isFinite(raw.money)||raw.money<0||raw.money>1e9||!Array.isArray(raw.pets)||raw.pets.length>1000)throw Error('Invalid save');
  const value=freshSave();Object.assign(value,{shift:raw.shift,money:raw.money,best:Number.isFinite(raw.best)?Math.max(0,raw.best):0,upgrade:raw.upgrade===true,garden:raw.garden===true});
  for(const pet of value.pets){
-  const old=raw.version===4?raw.pets.find(p=>p?.id===pet.id):pet.id==='mawhound'?raw.pets[0]:null;
+  const old=raw.version>=4?raw.pets.find(p=>p?.id===pet.id):pet.id==='mawhound'?raw.pets[0]:null;
   if(!old)continue;
   const legacyLevel=raw.version===1?1+raw.pets.length:(Number.isSafeInteger(old.level)?Math.max(1,old.level):1);
-  const fragments=raw.version===4?old.sigilFragments:raw.version===3?raw.sigilFragments:legacyLevel-1;
+  const fragments=raw.version>=4?old.sigilFragments:raw.version===3?raw.sigilFragments:legacyLevel-1;
   pet.sigilFragments=Number.isSafeInteger(fragments)?Math.max(0,Math.min(1e6,fragments)):0;
   pet.level=Math.max(1,Math.floor(pet.sigilFragments/SIGIL_PARTS));
-  pet.awakeningSeen=pet.sigilFragments>=SIGIL_PARTS&&(raw.version===4?old.awakeningSeen:raw.awakeningSeen)===true;
+  pet.awakeningSeen=pet.sigilFragments>=SIGIL_PARTS&&(raw.version>=4?old.awakeningSeen:raw.awakeningSeen)===true;
   pet.needs=Array.from({length:5},(_,i)=>Math.round(Math.max(0,Math.min(100,Number(old.needs?.[i])||0))));
  }
- value.selectedPet=raw.version===4&&PETS.some(p=>p.id===raw.selectedPet)?raw.selectedPet:'imp';return value;
+ value.mawhoundRewardUnlocked=raw.version>=5&&raw.mawhoundRewardUnlocked===true;
+ value.selectedPet=raw.version>=4&&PETS.some(p=>p.id===raw.selectedPet)?raw.selectedPet:'imp';if(value.selectedPet==='mawhound'&&!value.mawhoundRewardUnlocked)value.selectedPet='otty';return value;
 }
 export class Game {
   constructor(save = freshSave()) { this.save = validateSave(save); this.phase = 'lobby'; this.paused = false; this.message = 'The midnight delivery is here. Your first shift awaits.'; this.time = 300; this.serial = 0; this.parcel = null; this.puzzle = null; }
   get pet(){return this.save.pets.find(p=>p.id===this.save.selectedPet);}
-  selectPet(id){if(!['lobby','sanctuary','backroom','summary'].includes(this.phase)||!this.save.pets.some(p=>p.id===id))return false;this.save.selectedPet=id;this.message=this.pet.name+' sigil selected. Rescued fragments now restore this companion.';return true;}
+  get availablePets(){return this.save.pets.filter(p=>p.id!=='mawhound'||this.save.mawhoundRewardUnlocked);}
+  selectPet(id){if(!['lobby','sanctuary','backroom','summary'].includes(this.phase)||!this.availablePets.some(p=>p.id===id))return false;this.save.selectedPet=id;this.message=this.pet.name+' sigil selected. Rescued fragments now restore this companion.';return true;}
   start() {
     if (!['lobby', 'sanctuary', 'summary', 'backroom'].includes(this.phase)) return;
     this.rng = random(this.save.shift * 9127); this.phase = 'shift'; this.paused = false; this.time = 300; this.serial = 0; this.correct = 0; this.wrong = 0; this.earned = 0; this.fragmentsEarned = 0; this.pawOpportunities=0; this.puzzle = null;
@@ -75,7 +77,7 @@ export class Game {
     if(p.type==='demon'&&!['triangle','star','square'].includes(p.shape))p.shape='triangle';
     if(p.type==='curse'){
       const validCounts=v=>Array.isArray(v)&&v.length===4&&v.every(n=>Number.isInteger(n)&&n>=0);
-      if(!validCounts(p.recipe)||!validCounts(p.mixed)||!Number.isInteger(p.doses)||p.doses<1||typeof p.target!=='string'||p.recipe.reduce((a,b)=>a+b,0)!==p.doses||p.mixed.reduce((a,b)=>a+b,0)!==p.step||p.step>=p.doses){
+      if(!validCounts(p.recipe)||!validCounts(p.mixed)||!Number.isInteger(p.doses)||p.doses<1||p.doses>3||typeof p.target!=='string'||p.recipe.reduce((a,b)=>a+b,0)!==p.doses||p.mixed.reduce((a,b)=>a+b,0)!==p.step||p.step>=p.doses){
         this.puzzle=createPowderRecipe(this.save.shift,this.rng);this.message='Match the color splat. Hold a powder, move over the parcel, and release to pour.';
       }
     }
@@ -83,12 +85,17 @@ export class Game {
   pourPowder(index){
     this.ensurePuzzle();
     if(this.phase!=='shift'||this.paused||this.puzzle?.type!=='curse'||!Number.isInteger(index)||index<0||index>3)return;
-    const p=this.puzzle;p.mixed[index]++;p.step++;
-    if(p.step===p.doses){if(p.mixed.every((n,i)=>n===p.recipe[i])){this.resolve(true);return true;}
-      this.spend(4);if(this.phase==='shift'){p.mixed=[0,0,0,0];p.step=0;this.message='That mixture did not match. Four seconds lost. Try the same target again.';}return false;}
-    this.message='Powder mixed: '+p.step+' / '+p.doses+' doses. Match the target splat.';return true;
+    const p=this.puzzle,name=POWDERS[index].name;
+    if(p.mixed[index]>=p.recipe[index]){
+      p.feedback=p.recipe[index]===0?name+' is not part of this recipe.':name+' is already complete. Choose another color.';
+      p.feedbackTone='wrong';this.message=p.feedback+' Your correct powders are kept.';return false;
+    }
+    p.mixed[index]++;p.step++;p.feedbackTone='correct';p.feedback='Correct: '+name+'! '+p.step+' / '+p.doses+' powders matched.';
+    if(p.step===p.doses){this.resolve(true);this.message='Color matched! The curse is lifted. +10 coins.';return true;}
+    this.message=p.feedback+' Add another color to finish the mixture.';return true;
   }
-  resetPowder(){if(this.phase==='shift'&&!this.paused&&this.puzzle?.type==='curse'){this.puzzle.mixed=[0,0,0,0];this.puzzle.step=0;this.message='Mix cleared. Match the same target splat.';}}
+  resetPowder(){if(this.phase==='shift'&&!this.paused&&this.puzzle?.type==='curse'){this.puzzle.mixed=[0,0,0,0];this.puzzle.step=0;this.puzzle.feedback='Mix cleared. Try a color to check it.';this.puzzle.feedbackTone='neutral';this.message=this.puzzle.feedback;}}
+
   completeWard(puzzle){if(this.phase!=='shift'||this.paused||this.puzzle!==puzzle||puzzle?.type!=='demon')return false;this.resolve(true);return true;}
   act(index, inZone = false) {
     if (this.phase !== 'shift' || this.paused || !this.puzzle || ['curse','demon'].includes(this.puzzle.type)) return;

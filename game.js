@@ -1,15 +1,17 @@
 import * as THREE from './vendor/three.module.js';
-import { Game, freshSave, validateSave } from './core.js?v=0.13.2';
+import { Game, freshSave, validateSave } from './core.js?v=0.14.0';
 import { SHAPES, markSurface, MARK_SIZE } from './shapes.js';
 import {dressParcel,parcelArtReady} from './parcel-art.js';
 import { createCustomer } from './customer.js';
 import { celMaterial, boxSurfaceUV, inkEdges, inkSilhouette } from './cel.js';
 import {loadCardboardImp} from './cardboard-imp.js';
+import {loadOtty} from './otty.js';
+import {createMimicGame} from './mimic-game.js';
 import {loadMawhound} from './mawhound.js';
-import {createMawhoundSigil,renderSigilAwakening} from './sigil.js';
+import {createMawhoundSigil,renderSigilAwakening} from './sigil.js?v=0.14.0';
 
 import {createWardGame} from './ward-game.js';
-import {createPowderGame} from './powder-game.js';
+import {createPowderGame} from './powder-game.js?v=0.14.0';
 import {createCounterTools} from './counter-tools.js';
 import {createBackRoom} from './back-room.js';
 import {createOutdoorSanctuary} from './sanctuary-world.js';
@@ -17,7 +19,7 @@ import {createOutdoorSanctuary} from './sanctuary-world.js';
 const $ = id => document.getElementById(id);
 const SAVE = 'midnight-parcel-webxr-v1';
 let storageNote = '', stored;
-try { const raw = localStorage.getItem(SAVE); if (raw){const parsed=JSON.parse(raw);stored = validateSave(parsed);if(parsed.version<4){try{if(!localStorage.getItem(SAVE+'-backup-v'+parsed.version))localStorage.setItem(SAVE+'-backup-v'+parsed.version,raw);storageNote='Companion progress preserved · old save backed up';}catch{storageNote='Sigil progress converted in memory; browser could not write a backup.';}}} }
+try { const raw = localStorage.getItem(SAVE); if (raw){const parsed=JSON.parse(raw);stored = validateSave(parsed);if(parsed.version<5){try{if(!localStorage.getItem(SAVE+'-backup-v'+parsed.version))localStorage.setItem(SAVE+'-backup-v'+parsed.version,raw);storageNote='Companion progress preserved · old save backed up';}catch{storageNote='Sigil progress converted in memory; browser could not write a backup.';}}} }
 catch { storageNote = 'Save unavailable or damaged. A fresh session is ready; the old save is kept until you finish a shift.'; }
 const game = new Game(stored || freshSave());
 let sound = false, audio, elapsed = 0, lastUI = '', parcelId = '', heldBy = null, sanctuaryMode = false, sceneMode = ''; 
@@ -142,14 +144,14 @@ sign(petRoom,'RETURN TO YOUR ROOM',-2,2.95,-2.4,1.5,.16,'#ead8ff');
 const petsGroup=new THREE.Group();petsGroup.position.set(0,.04,-1.3);petRoom.add(petsGroup);
 let mawhoundTricks=false,mawhoundRoot=null,mawhoundController=null,mawhoundStatus='idle',petBadgeLevel=null;
 const petBadge=canvasPlane(petRoom,1.35,.18,0,.23,-.70,()=>{},512);
-const companions=new Map(),sigils={imp:createMawhoundSigil(true),mawhound:createMawhoundSigil()};
+const companions=new Map(),sigils={otty:createMawhoundSigil('ink'),imp:createMawhoundSigil(true),mawhound:createMawhoundSigil()};
 for(const item of Object.values(sigils)){petsGroup.add(item.root);item.root.visible=false;}
 let sigil=sigils[game.pet.id],revealTime=-1;
 function updatePetBadge(){const label=game.petAwakened&&game.pet.awakeningSeen?game.pet.name.toUpperCase()+' · LEVEL '+game.petLevel:game.pet.name.toUpperCase()+' SIGIL · '+game.sigilPieces+'/5';if(petBadgeLevel===label)return;petBadgeLevel=label;const c=petBadge.userData.canvas,ctx=c.getContext('2d');ctx.clearRect(0,0,c.width,c.height);ctx.fillStyle='#e4d3a6';ctx.font='bold '+c.height*.44+'px Georgia';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(label,c.width/2,c.height/2,c.width*.95);petBadge.material.map.needsUpdate=true;}
 async function ensureMawhound(){
  const pet=game.pet;if(!game.petAwakened||['loading','ready'].includes(companions.get(pet.id)?.status))return;
  const entry={status:'loading',controller:null};companions.set(pet.id,entry);mawhoundStatus='loading';sync(true);
- try{const loaded=await (pet.id==='imp'?loadCardboardImp():loadMawhound());entry.controller=loaded;entry.status='ready';loaded.setRoamBounds({minX:-.8,maxX:.7,minZ:-1.5,maxZ:.2});loaded.setAutonomous(pet.awakeningSeen);loaded.root.visible=false;petsGroup.add(loaded.root);}
+ try{const loaded=await (pet.id==='imp'?loadCardboardImp():pet.id==='otty'?loadOtty():loadMawhound());entry.controller=loaded;entry.status='ready';loaded.setRoamBounds({minX:-.8,maxX:.7,minZ:-1.5,maxZ:.2});loaded.setAutonomous(pet.awakeningSeen);loaded.root.visible=false;petsGroup.add(loaded.root);}
  catch(error){entry.status='error';console.error(pet.name+' model load failed:',error);}
  rebuildPets();sync(true);
 }
@@ -164,11 +166,12 @@ function selectCompanion(id){if(!game.selectPet(id))return;revealTime=-1;mawhoun
 const parcel = new THREE.Group();scene.add(parcel);
 const powderGame=createPowderGame({parcel,onPour:index=>invoke(()=>tone(game.pourPowder(index)))});scene.add(powderGame.root);
 const wardGame=createWardGame({parcel,onComplete:puzzle=>invoke(()=>tone(game.completeWard(puzzle)))});scene.add(wardGame.root);
+const mimicGame=createMimicGame({parcel,onLatch:()=>invoke(()=>act(0)),onError:message=>{game.message=message;sync(true);}});scene.add(mimicGame.root);
 const parcelHome=new THREE.Vector3(-.12,1.51,-.48);
 function disposeGroup(group) {
   for(const child of [...group.children]) {group.remove(child);child.traverse(o=>{if(!o.userData.sharedGeometry)o.geometry?.dispose();if(o.material&&!o.material.userData.shared){if(!o.material.map?.userData.shared)o.material.map?.dispose();o.material.dispose();}});}
 }
-function resetParcel() { if(heldBy)heldBy=null;scene.attach(parcel);parcel.position.copy(parcelHome);parcel.rotation.set(.08,-.28,0);if(['curse','demon'].includes(game.puzzle?.type))parcel.rotation.set(0,0,0);parcel.scale.setScalar(1); }
+function resetParcel() { if(heldBy)heldBy=null;scene.attach(parcel);parcel.position.copy(parcelHome);parcel.rotation.set(.08,-.28,0);if(['curse','demon','monster'].includes(game.puzzle?.type))parcel.rotation.set(0,0,0);parcel.scale.setScalar(1); }
 function markTexture(type) {
   const c=document.createElement('canvas');c.width=c.height=128;const ctx=c.getContext('2d');ctx.strokeStyle=ctx.fillStyle={curse:'#773c9c',monster:'#733132',demon:'#a53954',chibi:'#355e56'}[type];ctx.lineCap='round';ctx.lineWidth=8;
   if(type==='curse'){ctx.beginPath();for(let i=0;i<95;i++){const a=i/9,r=3+i*.44;const x=64+Math.cos(a)*r,y=64+Math.sin(a)*r;i?ctx.lineTo(x,y):ctx.moveTo(x,y);}ctx.stroke();}
@@ -232,7 +235,8 @@ function buildButtons() {
   if(['summary','backroom'].includes(game.phase)){worldTargets.push(...backRoom.targets);return;}
   const sanctuary=game.phase==='sanctuary';
   if(!sanctuary)worldTargets.push(...toolsOnCounter.targets);
-  const vrOptions=sanctuary?[...options]:game.phase==='lobby'||game.puzzle?[...options]:[];
+  if(game.puzzle?.type==='monster'&&!game.paused)worldTargets.push(...mimicGame.targets);
+  const vrOptions=game.puzzle?.type==='monster'&&!game.paused?[]:sanctuary?[...options]:game.phase==='lobby'||game.puzzle?[...options]:[];
   if(sanctuary)vrOptions.push({label:'Recenter view',run:recenter});
   (sanctuary?actionBoard:shopControls).add(buttonsGroup);shopControls.visible=!sanctuary&&vrOptions.length>0;
   const step=Math.min(.12,(sanctuary ? .86 : .36)/Math.max(1,vrOptions.length)), top=(sanctuary ? .18 : .15)-step/2;
@@ -263,8 +267,8 @@ function invoke(fn){const previous=game.phase;fn();if(game.phase==='summary'&&pr
 function start(){game.start();tone();}
 function closeShift(){if(!toolsOnCounter.busy)invoke(()=>game.close());}
 function togglePause(){if(game.phase==='shift'&&!toolsOnCounter.busy){game.paused=!game.paused;resetParcel();sync(true);}}
-function test(type){const ok=game.test(type);if(ok&&['curse','demon'].includes(type)){resetParcel();drag=null;}tone(ok);}
-function act(i){if(toolsOnCounter.busy)return;const value=timing();tone(game.act(i,value>=.35&&value<=.65));}
+function test(type){const ok=game.test(type);if(ok&&['curse','demon','monster'].includes(type)){resetParcel();drag=null;}tone(ok);}
+function act(i){if(toolsOnCounter.busy||(game.puzzle?.type==='monster'&&!mimicGame.ready))return;const value=timing();tone(game.act(i,value>=.35&&value<=.65));}
 function goBackRoom(){game.backRoom();mawhoundTricks=false;tone();}
 function sleepAndStart(){if(!['backroom','summary'].includes(game.phase))return;save();start();}
 function enterSanctuary(){game.sanctuary();rebuildPets();tone();}
@@ -274,8 +278,8 @@ function menu() {
   if(game.phase==='lobby')return [o(stored?'Continue · open shift':'Open the shop',start,'A five-minute shift at the midnight counter.',true),o('Go to back room',goBackRoom,game.petAwakened?`${game.pet.name} · level ${game.petLevel}`:`Restore the sigil · ${game.sigilPieces}/5`),o('How to play',()=>showGuide())];
   if(['summary','backroom'].includes(game.phase))return [o('Touch portal bottle',enterSanctuary,'Visit your companion in the outdoor sanctuary.',true),o('Sleep in bed',sleepAndStart,'Call it a night and begin the next shift.')];
   if(game.phase==='sanctuary') {
-    if(game.petAwakened&&game.pet.awakeningSeen&&mawhoundTricks)return [o('Back to care',()=>{mawhoundTricks=false;}),...(game.pet.id==='imp'?['Agree gesture','Walking','Running','Boxing practice','Play dead']:['Idle breathing','Walking','Rear-leg stand','Play bow','Curious head tilt','Happy greeting','Sniff around','Shake off']).map(name=>o(name,()=>{mawhoundController?.play(name,{loop:name==='Idle breathing'});game.message=name==='Walking'?game.pet.name+' is going for a little walk.':`${game.pet.name}: ${name}.`;}))];
-    const rows=[o('Return through portal',goBackRoom,'Rest in your bed to begin the next shift.',true),...game.save.pets.filter(p=>p.id!==game.pet.id).map(p=>o('Visit '+p.name,()=>selectCompanion(p.id),'Switch companion and the sigil receiving fragments.'))];
+    if(game.petAwakened&&game.pet.awakeningSeen&&mawhoundTricks)return [o('Back to care',()=>{mawhoundTricks=false;}),...(game.pet.id==='imp'?['Agree gesture','Walking','Running','Boxing practice','Play dead']:game.pet.id==='otty'?['Idle breathing','Walking','Upside-down swim','Four-leg stand','Boxing']:['Idle breathing','Walking','Rear-leg stand','Play bow','Curious head tilt','Happy greeting','Sniff around','Shake off']).map(name=>o(name,()=>{mawhoundController?.play(name,{loop:name==='Idle breathing'});game.message=name==='Walking'?game.pet.name+' is going for a little walk.':`${game.pet.name}: ${name}.`;}))];
+    const rows=[o('Return through portal',goBackRoom,'Rest in your bed to begin the next shift.',true),...game.availablePets.filter(p=>p.id!==game.pet.id).map(p=>o('Visit '+p.name,()=>selectCompanion(p.id),'Switch companion and the sigil receiving fragments.'))];
     if(game.petAwakened&&game.pet.awakeningSeen)rows.push(o('Feed',()=>care(0)),o('Brush',()=>care(1)),o('Tuck in',()=>care(2)),o('Play',()=>care(3)),o('Pet',()=>care(4)));
     if(game.petAwakened&&game.pet.awakeningSeen&&mawhoundStatus==='ready')rows.push(o('Animations & tricks',()=>{mawhoundTricks=true;}));
     if(mawhoundStatus==='error')rows.push(o('Retry companion model',()=>ensureMawhound()));
@@ -293,6 +297,7 @@ function menu() {
 function sync(force=false) {
   game.ensurePuzzle();
   if(parcelId!==game.parcel?.id){parcelId=game.parcel?.id;buildParcel();}
+  mimicGame.sync(game.puzzle?.type==='monster'?game.puzzle:null);
   powderGame.sync(game.puzzle?.type==='curse'?game.puzzle:null,game.parcel?SHAPES[game.parcel.shape]:null);wardGame.sync(game.puzzle?.type==='demon'?game.puzzle:null,game.parcel?SHAPES[game.parcel.shape].depth:0);if(game.paused){powderGame.cancel();wardGame.cancel();}
   const isSanctuary=game.phase==='sanctuary';
   const isBackRoom=['summary','backroom'].includes(game.phase),mode=isSanctuary?'sanctuary':isBackRoom?'backroom':'shop';
@@ -307,7 +312,7 @@ function sync(force=false) {
   $('shift').textContent=String(game.save.shift-(game.phase==='summary'?1:0)).padStart(2,'0');$('timer').textContent=game.phase==='shift'?formatTime(game.time):'—';$('money').textContent=game.save.money;
   $('message').textContent=game.paused?'The clock is stopped. Take your time.':game.message;
   $('title').textContent=game.phase==='lobby'?'Welcome, custodian.':isBackRoom?'The night is yours.':isSanctuary?(game.petAwakened&&game.pet.awakeningSeen?`${game.pet.name} · Level ${game.petLevel}`:`${game.pet.name} sigil · ${game.sigilPieces}/5`):game.paused?'A moment of quiet.':game.puzzle?({curse:'Unwind the curse.',monster:'Steady your hands.',demon:'Reverse the ward.',chibi:'A fragment is calling.'}[game.puzzle.type]):game.parcel?`${SHAPES[game.parcel.shape].name} #${game.parcel.id}`:'Customer arriving…';
-  $('hint').textContent=isSanctuary?(!game.petAwakened?'Five fragments restore the sigil. Paw opportunities follow a 2 / 2 / 1 shift rhythm.':!game.pet.awakeningSeen&&mawhoundStatus==='ready'?'The sigil is becoming '+game.pet.name+'…':mawhoundStatus==='loading'?'Loading '+game.pet.name+'…':mawhoundStatus==='error'?game.pet.name+' could not load. Use Retry companion model.':`${game.pet.name} is ${mawhoundController?.behaviorLabel||'watching you'}. Sigil: ${game.sigilPieces}/5 toward the next level.`):isBackRoom?'Touch the purple bottle to visit the sanctuary. Touch the bed to sleep and begin your next shift.':game.puzzle?.type==='demon'?'Parcel locked · hold mouse / VR trigger to trace the spell':game.puzzle?.type==='curse'?'Parcel locked · hold a powder with mouse/grip · release over the parcel to pour':'Hover for tool descriptions · touch/click to activate · drag parcels to inspect';
+  $('hint').textContent=isSanctuary?(!game.petAwakened?'Five fragments restore the sigil. Paw opportunities follow a 2 / 2 / 1 shift rhythm.':!game.pet.awakeningSeen&&mawhoundStatus==='ready'?'The sigil is becoming '+game.pet.name+'…':mawhoundStatus==='loading'?'Loading '+game.pet.name+'…':mawhoundStatus==='error'?game.pet.name+' could not load. Use Retry companion model.':`${game.pet.name} is ${mawhoundController?.behaviorLabel||'watching you'}. Sigil: ${game.sigilPieces}/5 toward the next level.`):isBackRoom?'Touch the purple bottle to visit the sanctuary. Touch the bed to sleep and begin your next shift.':game.puzzle?.type==='demon'?'Parcel locked · hold mouse / VR trigger to trace the spell':game.puzzle?.type==='monster'?'Parcel transformed · click the latch below its mouth while the needle is green':game.puzzle?.type==='curse'?'Parcel locked · hold a powder with mouse/grip · release over the parcel to pour':'Hover for tool descriptions · touch/click to activate · drag parcels to inspect';
   $('save-status').textContent=storageNote||'Saves between shifts · stored on this device';
   const key=JSON.stringify([game.pet.id,game.phase,game.paused,game.parcel?.id,game.puzzle?.type,game.puzzle?.step,mawhoundStatus,mawhoundTricks,game.sigilPieces,game.petLevel,game.pet.awakeningSeen,game.save.upgrade,game.save.garden]);
   if(force||key!==lastUI){lastUI=key;options=menu();$('actions').replaceChildren();
@@ -364,7 +369,7 @@ let previous=0,uiClock=0;
 renderer.setAnimationLoop(ms=>{
   const dt=previous?Math.min((ms-previous)/1000,1):0;previous=ms;
   if(!game.paused)elapsed+=dt;
-  const before=game.phase;if(!toolsOnCounter.busy)game.tick(dt);if(before==='shift'&&game.phase==='summary'){save();sync(true);}
+  const before=game.phase;if(!toolsOnCounter.busy&&!mimicGame.busy)game.tick(dt);if(before==='shift'&&game.phase==='summary'){save();sync(true);}
   uiClock+=dt;if(uiClock>.2){uiClock=0;sync();}
   if(game.puzzle?.type==='monster'){const needle=document.querySelector('.needle');if(needle)needle.style.left=`${timing()*100}%`;writeStatus();}
   if(parcelArtPending&&!heldBy){parcelArtPending=false;if(game.parcel)buildParcel();}
@@ -384,7 +389,7 @@ renderer.setAnimationLoop(ms=>{
   if(renderer.xr.isPresenting){for(const c of controllers){
     if(c.userData.source){powderGame.moveGrip(c,c.userData.grip);c.userData.grip.getWorldPosition(pos);const target=backRoom.root.visible?backRoom.touch(pos):sanctuaryMode?outdoorSanctuary.touch(pos):room.visible?toolsOnCounter.touch(pos):null;if(target)toolHover.push(target);if(target&&target!==c.userData.lastTouch){invoke(target.userData.run);pulse(c);}c.userData.lastTouch=target;}
     controllerRay(c);if(!game.paused)wardGame.move(c,ray);const hit=ray.intersectObjects(worldTargets)[0];if(hit)toolHover.push(hit.object);c.userData.line.scale.z=hit?hit.distance:2.5;c.userData.line.material.color.set(hit?'#a8e6ad':'#dfc88b');}}
-  if(!game.paused){powderGame.update(Math.min(dt,.05));wardGame.update(Math.min(dt,.05));}
+  if(!game.paused){mimicGame.update(Math.min(dt,.05),timing());powderGame.update(Math.min(dt,.05));wardGame.update(Math.min(dt,.05));}
   toolsOnCounter.setHover(toolHover);toolsOnCounter.update(Math.min(dt,.05));
   renderer.render(scene,camera);
 });

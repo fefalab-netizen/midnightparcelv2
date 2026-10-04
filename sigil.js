@@ -1,7 +1,7 @@
 import * as THREE from './vendor/three.module.js';
 // Five physical shards share one engraved symbol, so each recovered piece completes the drawing.
 export function createMawhoundSigil(brown=false){
- const palette=brown?['#94734f','#f3d9ac','#fff0ce','#ddba89','#bf8d4e','#f0d0a0','#dbb680']:['#463858','#ddc6ff','#f0dbff','#bca5d5','#9b58da','#d6b1ff','#b78bdf'];
+ const palette=brown==='ink'?['#08080d','#73717f','#a39eac','#292630','#17121f','#898190','#4e435b']:brown?['#94734f','#f3d9ac','#fff0ce','#ddba89','#bf8d4e','#f0d0a0','#dbb680']:['#463858','#ddc6ff','#f0dbff','#bca5d5','#9b58da','#d6b1ff','#b78bdf'];
  const root=new THREE.Group();root.position.set(0,.58,0);root.rotation.x=-.12;
  const canvas=document.createElement('canvas');canvas.width=canvas.height=512;const c=canvas.getContext('2d');c.fillStyle=palette[0];c.fillRect(0,0,512,512);c.strokeStyle=palette[1];c.lineWidth=8;c.beginPath();c.arc(256,256,210,0,Math.PI*2);c.stroke();
  c.beginPath();for(let i=0;i<=5;i++){const a=-Math.PI/2+i*4*Math.PI/5;const x=256+175*Math.cos(a),y=256+175*Math.sin(a);i?c.lineTo(x,y):c.moveTo(x,y);}c.stroke();

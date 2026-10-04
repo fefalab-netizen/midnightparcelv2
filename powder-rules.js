@@ -8,7 +8,7 @@ export function powderColor(counts){
  return '#'+rgb.map(n=>n.toString(16).padStart(2,'0')).join('');
 }
 export function createPowderRecipe(shift,random){
- const doses=1+Math.floor((shift-1)/3),recipe=[0,0,0,0],order=[0,1,2,3];
+ const doses=Math.min(3,1+Math.floor((shift-1)/3)),recipe=[0,0,0,0],order=[0,1,2,3];
  for(let i=3;i>0;i--){const j=Math.floor(random()*(i+1));[order[i],order[j]]=[order[j],order[i]];}
  for(let i=0;i<doses;i++)recipe[order[i<Math.min(doses,4)?i:Math.floor(random()*4)]]++;
  return {type:'curse',step:0,doses,recipe,mixed:[0,0,0,0],target:powderColor(recipe)};
